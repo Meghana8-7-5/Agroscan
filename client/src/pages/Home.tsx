@@ -1,8 +1,3 @@
-/*
-  AgroScan / Field Notes design reminder:
-  Lead with documentary crop imagery and an asymmetric editorial story.
-  Keep copy plain, actions explicit, and the leaf-notch motif visible in every key action.
-*/
 import { useState } from "react";
 import { Link } from "wouter";
 import {
@@ -18,59 +13,76 @@ import {
   Sparkles,
   Sprout,
   X,
+  Mic2,
+  Store,
+  BookOpen,
+  Layers,
+  Globe,
+  Users
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useUiEditContext } from "@/contexts/UiEditContext";
+import EditableFrame from "@/components/EditableFrame";
+import TreeVoiceAssistant from "@/components/TreeVoiceAssistant";
 
-const heroImage = "/manus-storage/agroscan-hero_49ce3f01.png";
-const farmerImage = "/manus-storage/agroscan-farmer-stock_130c484b.jpeg";
-const leafImage = "/manus-storage/agroscan-leaf-stock_de49ea7d.jpg";
+const heroImage = "/images/agroscan-hero-landing.jpg";
 
 const navItems = [
   { label: "Home", href: "/" },
-  { label: "About us", href: "/about" },
-  { label: "Services", href: "/services" },
-  { label: "Disease library", href: "/disease-library" },
-  { label: "Pest guide", href: "/pest-guide" },
-  { label: "Resources", href: "/resources" },
-  { label: "Contact", href: "/contact" },
-];
-
-const features = [
-  { icon: ScanLine, title: "AI detection", text: "Accurate & fast" },
-  { icon: ShieldCheck, title: "Expert guidance", text: "Trusted advice" },
-  { icon: Sprout, title: "Better yield", text: "Higher productivity" },
+  { label: "Scan Leaf", href: "/detection" },
+  { label: "Knowledge Base", href: "/knowledge-base" },
+  { label: "Store Locator", href: "/stores" },
+  { label: "Soil Recommender", href: "/soil-recommendation" },
+  { label: "Weather Alerts", href: "/weather" },
 ];
 
 function BrandMark() {
-  return <span className="brand-mark" aria-hidden="true"><Leaf size={23} /></span>;
+  return (
+    <EditableFrame id="home_brand_mark" className="brand-mark h-9 w-9 rounded-2xl bg-[#e5eddc] flex items-center justify-center text-[#2f6b45]">
+      <Leaf size={21} />
+    </EditableFrame>
+  );
 }
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { isAuthenticated } = useAuth();
+  const { getCustomization } = useUiEditContext();
+
+  const heroCustom = getCustomization("home_hero_section");
+  const headlineCustom = getCustomization("home_hero_headline");
+  const descCustom = getCustomization("home_hero_desc");
 
   return (
-    <div className="page-shell">
-      <header className="site-header">
-        <div className="container site-header-inner">
-          <Link href="/" className="brand-lockup" aria-label="AgroScan home">
+    <div className="page-shell bg-[#f7f8f4] text-[#1c3827]">
+      <header className="site-header sticky top-0 z-40 bg-[#f7f8f4]/95 backdrop-blur border-b border-[#e1e6d7]">
+        <div className="container site-header-inner flex items-center justify-between py-4">
+          <Link href="/" className="brand-lockup flex items-center gap-2.5 no-underline" aria-label="AgroScan home">
             <BrandMark />
             <span>
-              <span className="brand-name">AgroScan</span>
-              <span className="brand-kicker">Smart field notes</span>
+              <span className="brand-name font-display text-xl font-extrabold text-[#193625]">AgroScan</span>
+              <span className="brand-kicker text-[11px] font-bold uppercase tracking-wider text-[#2f6b45] block">AI Farming Assistant</span>
             </span>
           </Link>
 
-          <nav className="site-nav" aria-label="Primary navigation">
-            {navItems.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}
+          <nav className="site-nav hidden lg:flex items-center gap-6 text-sm font-bold text-[#2b4c38]" aria-label="Primary navigation">
+            {navItems.map((item) => (
+              <Link key={item.href} href={item.href} className="hover:text-[#2f6b45]">
+                {item.label}
+              </Link>
+            ))}
           </nav>
 
-          <div className="header-actions">
-            <label className="sr-only" htmlFor="language">Select language</label>
-            <select id="language" className="language-select" defaultValue="English" aria-label="Select language">
-              <option>English</option>
-              <option>हिन्दी</option>
-              <option>తెలుగు</option>
-            </select>
-            <Link href="/register" className="header-cta">Get started</Link>
+          <div className="header-actions flex items-center gap-3">
+            {/* Get Started -> Direct link to /get-started single role-selection screen */}
+            <Link
+              href={isAuthenticated ? "/dashboard" : "/get-started"}
+              className="rounded-xl bg-[#2f6b45] hover:bg-[#20492f] px-5 py-2.5 text-sm font-bold text-white shadow-md flex items-center gap-1.5 transition-all no-underline"
+            >
+              <span>{isAuthenticated ? "Open Dashboard" : "Get Started"}</span>
+              <ArrowRight size={15} />
+            </Link>
+
             <button
               type="button"
               className="inline-grid h-11 w-11 place-items-center rounded-full border border-[#d8dfca] bg-[#fffdf5] text-[#2f6b45] lg:hidden"
@@ -82,11 +94,17 @@ export default function Home() {
             </button>
           </div>
         </div>
+
         {menuOpen && (
-          <div className="container mt-4 border-t border-[#dfe4d5] pt-3 lg:hidden">
+          <div className="container mt-2 border-t border-[#dfe4d5] py-3 lg:hidden">
             <nav className="grid gap-1" aria-label="Mobile navigation">
               {navItems.map((item) => (
-                <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-3 text-sm font-bold text-[#34543e] no-underline hover:bg-[#e5eddc]">
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="rounded-xl px-3 py-2.5 text-sm font-bold text-[#34543e] no-underline hover:bg-[#e5eddc]"
+                >
                   {item.label}
                 </Link>
               ))}
@@ -96,111 +114,187 @@ export default function Home() {
       </header>
 
       <main>
-        <section className="hero-wrap" aria-labelledby="hero-title">
+        {/* Hero Section with EditableFrame */}
+        <section className="hero-wrap py-12 lg:py-20" aria-labelledby="hero-title">
           <div className="container">
-            <div className="hero-grid">
-              <div className="hero-copy">
-                <p className="eyebrow"><Leaf size={14} strokeWidth={2.3} /> Crop care, made clearer</p>
-                <h1 id="hero-title" className="hero-title text-balance">
-                  <span className="hero-line">Spot the problem</span>
-                  <span className="hero-line">before the field</span>
-                  <em>feels it.</em>
-                </h1>
-                <p className="hero-description">Take a photo of an affected leaf and see the likely issue, severity, and next step — before a small sign becomes a lost row.</p>
-                <div className="hero-actions">
-                  <Link href="/detection" className="primary-button"><span className="cta-mark"><Leaf size={14} /></span> Scan a leaf</Link>
-                  <Link href="#about" className="secondary-button">See how it helps <ArrowRight size={16} /></Link>
+            <div className="hero-grid grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+              <div className="hero-copy lg:col-span-7 space-y-6">
+                <EditableFrame id="home_hero_badge" isTextOnly className="inline-block">
+                  <p className="eyebrow inline-flex items-center gap-2 rounded-full bg-[#e5eddc] px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-[#2f6b45]">
+                    <Mic2 size={14} /> Multilingual, Voice-First AI Farming Assistant
+                  </p>
+                </EditableFrame>
+
+                <EditableFrame id="home_hero_headline" isTextOnly>
+                  <h1 id="hero-title" className="hero-title font-display text-4xl sm:text-6xl font-extrabold leading-tight text-[#163322]">
+                    {headlineCustom?.title || (
+                      <>
+                        No typing required.<br />
+                        <span className="text-[#2f6b45]">Just ask "Tree"</span> in your language.
+                      </>
+                    )}
+                  </h1>
+                </EditableFrame>
+
+                <EditableFrame id="home_hero_desc" isTextOnly>
+                  <p className="hero-description text-base sm:text-lg leading-relaxed text-[#4b6957] max-w-xl">
+                    {descCustom?.subtitle ||
+                      "Scan leaves for general health & specific diseases, get proactive disaster weather warnings, locate nearby chemical stores, and follow stage-by-stage growing plans."}
+                  </p>
+                </EditableFrame>
+
+                <div className="hero-actions flex flex-wrap items-center gap-4">
+                  {/* Primary CTA triggers /get-started single role selection screen */}
+                  <Link
+                    href={isAuthenticated ? "/dashboard" : "/get-started"}
+                    className="primary-button inline-flex items-center gap-2 rounded-2xl bg-[#2f6b45] px-6 py-3.5 text-sm font-bold text-white shadow-lg hover:bg-[#20492f] transition-all no-underline"
+                  >
+                    <Sprout size={16} /> Get Started <ArrowRight size={16} />
+                  </Link>
+
+                  <Link
+                    href="/detection"
+                    className="secondary-button inline-flex items-center gap-2 rounded-2xl border border-[#b8caa9] bg-white px-6 py-3.5 text-sm font-bold text-[#244531] hover:bg-[#edf4e6] no-underline"
+                  >
+                    <ScanLine size={16} /> Scan Leaf Instantly
+                  </Link>
                 </div>
               </div>
 
-              <div className="hero-visual" aria-label="Illustration of a crop field with a sample detection result">
-                <img className="hero-image" src={heroImage} alt="Sunlit rows of crops with a leaf in the foreground" />
-                <span className="hero-index">01</span>
-                <div className="contour-lines" aria-hidden="true" />
-                <article className="hero-result-card">
-                  <div className="result-topline">
-                    <span className="result-label"><span className="result-dot" /> Disease detected</span>
-                    <span className="result-confidence">94% confident</span>
+              {/* Hero Image Panel */}
+              <div className="hero-visual lg:col-span-5 relative" aria-label="Illustration of crop scanning">
+                <EditableFrame id="home_hero_image_frame" isHeroPanel className="rounded-3xl overflow-hidden shadow-2xl">
+                  <img
+                    className="hero-image rounded-3xl shadow-2xl w-full object-cover max-h-[420px]"
+                    src={heroCustom?.customImageUrl || heroImage}
+                    alt="Sunlit crop field"
+                  />
+                </EditableFrame>
+
+                <article className="hero-result-card absolute bottom-4 left-4 right-4 rounded-2xl border border-[#2f6b45]/30 bg-white/95 p-4 shadow-xl backdrop-blur">
+                  <div className="result-topline flex items-center justify-between text-xs">
+                    <span className="result-label font-bold text-[#2f6b45] flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" /> Tree AI Scan Active
+                    </span>
+                    <span className="result-confidence font-bold text-emerald-700">96% Confident</span>
                   </div>
-                  <h2 className="result-name">Leaf blight</h2>
-                  <div className="result-meta"><span>Tomato</span><span>Moderate</span></div>
-                  <Link href="/detection" className="result-link">Read the treatment steps <ArrowUpRight size={14} /></Link>
+                  <h2 className="result-name font-display text-lg font-bold text-[#163322] mt-1">Tomato Late Blight</h2>
+                  <p className="text-xs text-[#52705d] mt-0.5">Recommended: Cymoxanil 8% + Mancozeb 64%WP (Curzate @ 600g/acre)</p>
+                  <Link href="/detection" className="result-link text-xs font-bold text-[#2f6b45] inline-flex items-center gap-1 mt-2 hover:underline">
+                    Read Treatment &amp; Locate Stores <ArrowUpRight size={14} />
+                  </Link>
                 </article>
               </div>
             </div>
-
-            <div className="feature-ribbon" aria-label="AgroScan benefits">
-              {features.map(({ icon: Icon, title, text }, index) => (
-                <div className="feature-badge" key={title} style={{ animation: `rise-in 650ms ${200 + index * 70}ms var(--ease-out) both` }}>
-                  <span className="feature-icon"><Icon size={20} strokeWidth={1.9} /></span>
-                  <div><h3>{title}</h3><p>{text}</p></div>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 
-        <section id="about" className="editorial-section" aria-labelledby="story-title">
-          <div className="container">
-            <div className="section-rule"><span>01 / Why AgroScan</span></div>
-            <div className="split-story">
-              <div className="story-copy">
-                <p className="eyebrow">A small check can change a season</p>
-                <h2 id="story-title" className="story-title">A better answer starts with one leaf.</h2>
-                <p>AgroScan turns a quick phone photo into field-ready guidance. No app install, no complicated dashboard, and no guessing which treatment to try first.</p>
-                <div className="story-list">
-                  <div className="story-list-item"><span><Check size={12} /></span> Works in any browser, even on older phones</div>
-                  <div className="story-list-item"><span><Check size={12} /></span> Shows organic and chemical options side by side</div>
-                  <div className="story-list-item"><span><Check size={12} /></span> Helps you act while the crop can still recover</div>
-                </div>
-              </div>
-              <div className="story-photo">
-                <img src={farmerImage} alt="Farmer checking leaves in a green crop field" />
-                <div className="photo-caption">A clear answer for the next walk through the field.</div>
-              </div>
+        {/* Feature Cards Grid */}
+        <section className="py-12 bg-white border-y border-[#e1e6d7]">
+          <div className="container max-w-7xl mx-auto px-4">
+            <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
+              <p className="text-xs font-extrabold uppercase tracking-widest text-[#2f6b45]">7 Core Pillars of AgroScan</p>
+              <h2 className="font-display text-3xl font-bold text-[#183624]">Everything Your Farm Needs By Voice</h2>
             </div>
-          </div>
-        </section>
 
-        <section id="services" className="service-strip" aria-labelledby="services-title">
-          <div className="container">
-            <div className="section-rule"><span id="services-title">02 / How it works</span></div>
-            <div className="service-grid">
-              <article className="service-card">
-                <span className="service-number">01 / CAPTURE</span>
-                <div><h3>Show us the leaf.</h3><p>Use your camera or upload a photo in a few clear taps.</p></div>
-              </article>
-              <article className="service-card" style={{ backgroundImage: `linear-gradient(120deg, rgba(229,237,220,.96), rgba(229,237,220,.72)), url(${leafImage})`, backgroundPosition: "right center", backgroundSize: "cover" }}>
-                <span className="service-number">02 / UNDERSTAND</span>
-                <div><h3>Read the signal.</h3><p>See the likely issue, confidence, and severity in plain language.</p></div>
-              </article>
-              <article className="service-card">
-                <span className="service-number">03 / ACT</span>
-                <div><h3>Choose the next step.</h3><p>Compare treatment options and keep your crop plan moving.</p></div>
-              </article>
-            </div>
-            <div className="mt-7 flex flex-wrap items-center gap-3 text-sm font-bold text-[#4c6654]">
-              <CloudSun size={18} className="text-[#2f6b45]" /> Weather, market prices, offline mode, and voice help are coming soon.
-              <Link href="/resources" className="inline-flex items-center gap-1 text-[#2f6b45] no-underline hover:underline">Read the roadmap <ArrowUpRight size={14} /></Link>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <EditableFrame id="home_feature_scan" className="rounded-3xl border border-[#d8e0cc] bg-[#fafcf7] p-6 space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2f6b45] text-white">
+                  <ScanLine size={22} />
+                </div>
+                <h3 className="font-display text-xl font-bold text-[#183624]">Plant &amp; Disease Scanning</h3>
+                <p className="text-xs text-[#52705d] leading-relaxed">
+                  Live camera scan for general health (nutrient/water stress) &amp; specific fungal, bacterial, viral, or insect damage across 37 crops.
+                </p>
+                <Link href="/detection" className="inline-flex items-center gap-1 text-xs font-bold text-[#2f6b45] hover:underline pt-2">
+                  Try Scanning <ArrowRight size={14} />
+                </Link>
+              </EditableFrame>
+
+              <EditableFrame id="home_feature_stores" className="rounded-3xl border border-[#d8e0cc] bg-[#fafcf7] p-6 space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2f6b45] text-white">
+                  <Store size={22} />
+                </div>
+                <h3 className="font-display text-xl font-bold text-[#183624]">Nearby Store Locator</h3>
+                <p className="text-xs text-[#52705d] leading-relaxed">
+                  Locates nearby agri-input dealers stocking recommended chemicals (Mancozeb, Coragen, Confidor) with stock status, distance, and direction options.
+                </p>
+                <Link href="/stores" className="inline-flex items-center gap-1 text-xs font-bold text-[#2f6b45] hover:underline pt-2">
+                  Locate Dealers <ArrowRight size={14} />
+                </Link>
+              </EditableFrame>
+
+              <EditableFrame id="home_feature_weather" className="rounded-3xl border border-[#d8e0cc] bg-[#fafcf7] p-6 space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2f6b45] text-white">
+                  <CloudSun size={22} />
+                </div>
+                <h3 className="font-display text-xl font-bold text-[#183624]">Weather &amp; Disaster Prevention</h3>
+                <p className="text-xs text-[#52705d] leading-relaxed">
+                  GPS farm-level weather alerts for heavy rain, flood risk, frost, and hailstorms tied directly to actionable spraying advice.
+                </p>
+                <Link href="/weather" className="inline-flex items-center gap-1 text-xs font-bold text-[#2f6b45] hover:underline pt-2">
+                  Check Farm Forecast <ArrowRight size={14} />
+                </Link>
+              </EditableFrame>
+
+              <EditableFrame id="home_feature_soil" className="rounded-3xl border border-[#d8e0cc] bg-[#fafcf7] p-6 space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2f6b45] text-white">
+                  <Layers size={22} />
+                </div>
+                <h3 className="font-display text-xl font-bold text-[#183624]">Soil-Type Crop Recommender</h3>
+                <p className="text-xs text-[#52705d] leading-relaxed">
+                  Evaluates 9 soil types (Sandy, Clayey, Black Cotton, Red, Alluvial) to recommend optimal crops, water needs, and yield expectations.
+                </p>
+                <Link href="/soil-recommendation" className="inline-flex items-center gap-1 text-xs font-bold text-[#2f6b45] hover:underline pt-2">
+                  View Soil Recommendations <ArrowRight size={14} />
+                </Link>
+              </EditableFrame>
+
+              <EditableFrame id="home_feature_kb" className="rounded-3xl border border-[#d8e0cc] bg-[#fafcf7] p-6 space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2f6b45] text-white">
+                  <BookOpen size={22} />
+                </div>
+                <h3 className="font-display text-xl font-bold text-[#183624]">Complete 37-Crop Knowledge Base</h3>
+                <p className="text-xs text-[#52705d] leading-relaxed">
+                  Deep agronomic database for all cereals, pulses, vegetables, fruits, flowers, and tobacco, plus WALES tank-mixing protocols.
+                </p>
+                <Link href="/knowledge-base" className="inline-flex items-center gap-1 text-xs font-bold text-[#2f6b45] hover:underline pt-2">
+                  Open Master Library <ArrowRight size={14} />
+                </Link>
+              </EditableFrame>
+
+              <EditableFrame id="home_feature_voice" className="rounded-3xl border border-[#d8e0cc] bg-[#fafcf7] p-6 space-y-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2f6b45] text-white">
+                  <Globe size={22} />
+                </div>
+                <h3 className="font-display text-xl font-bold text-[#183624]">10 Spoken Languages</h3>
+                <p className="text-xs text-[#52705d] leading-relaxed">
+                  Full speech recognition and speech synthesis in English, Telugu, Hindi, Tamil, Kannada, Marathi, Punjabi, Bengali, Gujarati, and Malayalam.
+                </p>
+                <Link
+                  href="/get-started"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-[#2f6b45] hover:underline pt-2"
+                >
+                  Try Voice Assistant <ArrowRight size={14} />
+                </Link>
+              </EditableFrame>
             </div>
           </div>
         </section>
       </main>
 
-      <footer id="contact" className="site-footer">
-        <div className="container footer-inner">
-          <div>
-            <Link href="/" className="brand-lockup" aria-label="AgroScan home">
-              <BrandMark />
-              <span className="brand-name">AgroScan</span>
-            </Link>
-            <p className="footer-note mt-3">A clear next step for every crop walk.</p>
+      <footer className="site-footer bg-[#173322] py-10 text-white">
+        <div className="container flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <Leaf size={18} className="text-emerald-400" />
+            <span>AgroScan — AI Farming Assistant © 2026</span>
           </div>
-          <div className="footer-links">
-            <Link href="/register">Register to save a scan</Link>
-            <Link href="/login">Log in</Link>
-            <Link href="/contact">Ask for help</Link>
-            <span className="inline-flex items-center gap-1 text-[#7d8f79]"><Sparkles size={13} /> No subscription</span>
+          <div className="flex gap-6">
+            <Link href={isAuthenticated ? "/dashboard" : "/get-started"} className="hover:text-emerald-300">
+              Get Started
+            </Link>
+            <Link href="/detection" className="hover:text-emerald-300">Scan Leaf</Link>
+            <Link href="/knowledge-base" className="hover:text-emerald-300">Knowledge Base</Link>
           </div>
         </div>
       </footer>

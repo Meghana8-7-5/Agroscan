@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: agroscan-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agroscan
+      POSTGRES_USER: agroscan_user
+      POSTGRES_PASSWORD: secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - agroscan_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agroscan_user -d agroscan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  agroscan_pg_data:
