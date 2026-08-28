@@ -1,6 +1,9 @@
 # AgroScan
 
-AgroScan is a web-based, AI-assisted agriculture platform for farmers. The approved frontend is designed as a warm **Field Notes** crop-care companion: it turns a farmer’s next field action into a clear, calm step such as registering a crop, reviewing a plan, scanning a leaf, reading the weather, or acting on a notification. The repository also contains the existing PostgreSQL schema, migrations, seed data, and database documentation.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Meghana8-7-5/Agroscan)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Meghana8-7-5/Agroscan)
+
+AgroScan is a full-stack, AI-assisted smart agriculture platform for farmers and agronomists. It features real-time plant disease scanning, crop-care scheduling, GPS weather advisories, store locator, soil recommendations, multilingual support across 10 Indian regional languages, and an Administrator control desk with live UI Edit Mode.
 
 ## Repository structure
 
