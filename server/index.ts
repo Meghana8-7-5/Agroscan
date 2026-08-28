@@ -22,9 +22,13 @@ import supportRoutes from "./routes/support.js";
 export function createApp() {
   const app = express();
 
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+    : true;
+
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+      origin: corsOrigin,
       credentials: true,
     }),
   );
@@ -72,10 +76,11 @@ export function createApp() {
 async function startServer() {
   const app = createApp();
   const server = createServer(app);
-  const port = Number(process.env.PORT || 3001);
+  const defaultPort = process.env.NODE_ENV === "production" ? 5000 : 3001;
+  const port = Number(process.env.PORT || defaultPort);
 
-  server.listen(port, () => {
-    console.log(`AgroScan API running on http://localhost:${port}/`);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`AgroScan server running on http://0.0.0.0:${port}/ (NODE_ENV=${process.env.NODE_ENV || "development"})`);
     console.log(`Health check: http://localhost:${port}/api/health`);
   });
 }

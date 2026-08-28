@@ -1,0 +1,11 @@
+node_modules
+.pnpm-store
+dist
+build
+.git
+.github
+.manus-logs
+.env
+*.env
+*.log
+backend/.venv
