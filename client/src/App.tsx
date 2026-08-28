@@ -1,41 +1,51 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./contexts/ThemeContext";
+/*
+  AgroScan / Field Notes design reminder:
+  Keep the shell calm and explicit: warm oat canvas, deep ink type,
+  botanical green actions, and clear escape routes on every page.
+*/
+import { useState } from "react";
+import { Link, Route, Switch } from "wouter";
+import { ArrowLeft, Leaf } from "lucide-react";
 import Home from "./pages/Home";
 
-
-function Router() {
+function ComingSoon({ title }: { title: string }) {
   return (
-    <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
-    </Switch>
+    <main className="min-h-screen bg-background px-6 py-12 text-foreground sm:px-10">
+      <div className="mx-auto flex min-h-[70vh] max-w-2xl flex-col justify-center">
+        <Link href="/" className="mb-10 inline-flex w-fit items-center gap-2 text-sm font-bold text-[#2f6b45] no-underline">
+          <ArrowLeft size={16} /> Back to AgroScan
+        </Link>
+        <div className="mb-6 grid h-14 w-14 place-items-center rounded-2xl bg-[#e5eddc] text-[#2f6b45]">
+          <Leaf size={25} />
+        </div>
+        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-[#2f6b45]">Field Notes / Next page</p>
+        <h1 className="mt-4 font-display text-5xl font-semibold leading-[0.95] tracking-[-0.06em] text-[#214433] sm:text-7xl">{title}</h1>
+        <p className="mt-6 max-w-lg text-base leading-7 text-muted-foreground">This screen is part of the AgroScan roadmap. The shared route is ready, and this page will be built one approval at a time.</p>
+      </div>
+    </main>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
+  const [theme] = useState("light");
+
   return (
-    <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
-      </ThemeProvider>
-    </ErrorBoundary>
+    <div className={theme === "dark" ? "dark" : ""}>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/register"><ComingSoon title="Register" /></Route>
+        <Route path="/login"><ComingSoon title="Login" /></Route>
+        <Route path="/dashboard"><ComingSoon title="Dashboard" /></Route>
+        <Route path="/detection"><ComingSoon title="Scan your crop" /></Route>
+        <Route path="/about"><ComingSoon title="About AgroScan" /></Route>
+        <Route path="/services"><ComingSoon title="Services" /></Route>
+        <Route path="/disease-library"><ComingSoon title="Disease Library" /></Route>
+        <Route path="/pest-guide"><ComingSoon title="Pest Guide" /></Route>
+        <Route path="/resources"><ComingSoon title="Resources" /></Route>
+        <Route path="/contact"><ComingSoon title="Contact" /></Route>
+        <Route><ComingSoon title="Page not found" /></Route>
+      </Switch>
+    </div>
   );
 }
 
