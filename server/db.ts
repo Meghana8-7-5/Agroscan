@@ -40,12 +40,7 @@ export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   text: string,
   params?: unknown[],
 ) {
-  try {
-    return await pool.query<T>(text, params);
-  } catch (err: any) {
-    console.warn(`[DATABASE QUERY WARNING] ${err.message || err}`);
-    throw err;
-  }
+  return pool.query<T>(text, params);
 }
 
 export async function checkDbConnection(): Promise<boolean> {

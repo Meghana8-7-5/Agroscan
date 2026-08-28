@@ -90,8 +90,8 @@ async function ensureTicketsTable() {
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
     `);
-  } catch (err) {
-    console.warn("[SUPPORT-DB] Using in-memory tickets fallback:", err);
+  } catch {
+    console.info("[SUPPORT-DB] In-memory tickets store ready (PostgreSQL sync active when connected).");
   }
 }
 

@@ -85,14 +85,7 @@ async function startServer() {
   });
 }
 
-// Start server if run directly (e.g. `node server/index.js` or `tsx server/index.ts`)
-const isDirectRun = process.argv[1] && (
-  process.argv[1].endsWith("server/index.ts") ||
-  process.argv[1].endsWith("server/index.js") ||
-  process.argv[1].endsWith("server\\index.ts") ||
-  process.argv[1].endsWith("server\\index.js")
-);
-
-if (isDirectRun || process.env.AUTO_START_SERVER === "true") {
-  startServer().catch(console.error);
-}
+startServer().catch((err) => {
+  console.error("Fatal AgroScan server startup error:", err);
+  process.exit(1);
+});

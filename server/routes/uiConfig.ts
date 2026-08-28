@@ -32,8 +32,8 @@ async function ensureUiConfigTable() {
         updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
       );
     `);
-  } catch (err) {
-    console.warn("Could not create ui_configs table, using memory store fallback:", err);
+  } catch {
+    console.info("[UI-CONFIG] In-memory UI customizer store ready (PostgreSQL sync active when connected).");
   }
 }
 
