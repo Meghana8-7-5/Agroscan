@@ -16,12 +16,20 @@ function getConnectionString(): string {
   return `postgresql://${user}:${password}@${host}:${port}/${database}`;
 }
 
+const connectionString = getConnectionString();
+const isRemoteDb =
+  Boolean(connectionString) &&
+  !connectionString.includes("localhost") &&
+  !connectionString.includes("127.0.0.1");
+
+const useSsl = process.env.DB_SSL === "true" || (isRemoteDb && process.env.DB_SSL !== "false");
+
 export const pool = new Pool({
-  connectionString: getConnectionString(),
-  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+  connectionString,
+  ssl: useSsl ? { rejectUnauthorized: false } : undefined,
   max: 20,
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 5_000,
+  connectionTimeoutMillis: 10_000,
 });
 
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
@@ -39,3 +47,6 @@ export async function checkDbConnection(): Promise<boolean> {
     return false;
   }
 }
+
+export default pool;
+

@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: agroscan
+    runtime: node
+    plan: free
+    buildCommand: pnpm install --frozen-lockfile && pnpm run check && pnpm run build
+    startCommand: node dist/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agroscan-postgres
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+
+databases:
+  - name: agroscan-postgres
+    plan: free
+    databaseName: agroscan
+    user: agroscan_user

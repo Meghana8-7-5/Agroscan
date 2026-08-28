@@ -14,6 +14,13 @@ const connectionString =
   process.env.DATABASE_URL ||
   `postgresql://${process.env.DB_USER || "agroscan_user"}:${process.env.DB_PASSWORD || "secure_password"}@${process.env.DB_HOST || "localhost"}:${process.env.DB_PORT || "5432"}/${process.env.DB_NAME || "agroscan"}`;
 
+const isRemoteDb =
+  Boolean(connectionString) &&
+  !connectionString.includes("localhost") &&
+  !connectionString.includes("127.0.0.1");
+
+const useSsl = process.env.DB_SSL === "true" || (isRemoteDb && process.env.DB_SSL !== "false");
+
 async function runSqlFile(client, relativePath) {
   const filePath = path.join(root, relativePath);
   const sql = fs.readFileSync(filePath, "utf8");
@@ -32,7 +39,10 @@ async function hashSeedPasswords(client) {
 }
 
 async function main() {
-  const client = new pg.Client({ connectionString });
+  const client = new pg.Client({
+    connectionString,
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+  });
 
   try {
     console.log("Connecting to PostgreSQL...");
