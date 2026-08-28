@@ -1,27 +1,57 @@
 # Dependencies
 **/node_modules
+node_modules/
 .pnpm-store/
 
 # Build outputs
 dist/
 build/
+.next/
+out/
 *.dist
 
-# Environment variables
+# Environment and secret files
 .env
 .env.local
+.env.development
 .env.development.local
+.env.staging
+.env.production
 .env.test.local
-.env.production.local
+*.env
+
+# Database backups, dumps, and local databases
+*.dump
+*.tar
+*.sql.bak
+*.sql.old
+*.db
+*.sqlite
+*.sqlite3
+pg_dump_*
+database_dumps/
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
 
 # IDE and editor files
 .vscode/
 .idea/
+*.sublime-workspace
+*.sublime-project
 *.swp
 *.swo
 *~
 
-# OS generated files
+# Operating system files
 .DS_Store
 .DS_Store?
 ._*
@@ -29,85 +59,46 @@ build/
 .Trashes
 ehthumbs.db
 Thumbs.db
+Desktop.ini
 
-# Logs
+# Logs and runtime data
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.pnpm-debug.log*
 lerna-debug.log*
-
-# Runtime data
 pids
 *.pid
 *.seed
 *.pid.lock
 
-# Coverage directory used by tools like istanbul
+# Coverage and caches
 coverage/
 *.lcov
-
-# nyc test coverage
 .nyc_output
-
-# Dependency directories
-jspm_packages/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
 .npm
-
-# Optional eslint cache
 .eslintcache
-
-# Microbundle cache
 .rpt2_cache/
 .rts2_cache_cjs/
 .rts2_cache_es/
 .rts2_cache_umd/
-
-# Optional REPL history
 .node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# parcel-bundler cache (https://parceljs.org/)
 .cache
-.parcel-cache
-
-# Next.js build output
-.next
-
-# Nuxt.js build / generate output
-.nuxt
-
-# Gatsby files
 .cache/
+.parcel-cache
+jspm_packages/
 
-# Storybook build outputs
-.out
-.storybook-out
-
-# Temporary folders
+# Packaging and tooling
+*.tgz
+.yarn-integrity
 tmp/
 temp/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
+.storybook-out
 
-# Manus version file (auto-generated, not part of source)
+# Manus metadata
 client/public/__manus__/version.json
 .project-config.json

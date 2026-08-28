@@ -1,10 +1,28 @@
 # AgroScan
 
-AgroScan is a responsive crop-care companion interface designed around a warm **Field Notes** visual language. The frontend turns a farmer’s next field action into a clear, calm step: register a crop, review a plan, scan a leaf, read the weather, or act on a notification.
+AgroScan is a web-based, AI-assisted agriculture platform for farmers. The approved frontend is designed as a warm **Field Notes** crop-care companion: it turns a farmer’s next field action into a clear, calm step such as registering a crop, reviewing a plan, scanning a leaf, reading the weather, or acting on a notification. The repository also contains the existing PostgreSQL schema, migrations, seed data, and database documentation.
 
-## Current scope
+## Repository structure
 
-This milestone contains the approved Part 1 frontend only. It is a client-side React application with route-based navigation, local state for interactive flows, and mock data where a backend or ML service will be connected later.
+```text
+Agroscan/
+├── client/                     # React + Vite frontend
+│   ├── src/pages/              # Route-level AgroScan pages
+│   ├── src/mock/               # Mock detection API used by the frontend
+│   └── src/index.css           # Field Notes design tokens and page styles
+├── database/                   # PostgreSQL schema, migrations, seed data and docs
+│   ├── README.md               # Database architecture and setup guide
+│   ├── schema.sql              # PostgreSQL DDL
+│   ├── seed.sql                # Development seed data
+│   └── migrations/             # Idempotent database migrations
+├── server/                     # Static-template compatibility server
+├── shared/                     # Shared project constants
+├── ideas.md                    # Approved Field Notes design decisions
+├── todo.md                     # Frontend and delivery checklist
+└── README.md                   # Project overview
+```
+
+## Approved frontend routes
 
 | Route | Purpose | Current behavior |
 |---|---|---|
@@ -18,13 +36,13 @@ This milestone contains the approved Part 1 frontend only. It is a client-side R
 | `/weather` | Weather Analysis | Per-field selection, metrics, short forecast |
 | `/notifications` | Notifications | Filters, unread state, mark-all-read behavior, actionable rows |
 
-The remaining Dashboard destinations are intentionally navigable placeholders until their later page milestones are approved: Market store, Help desk, AI voice assistant, Language, and More tools.
+The remaining Dashboard destinations are navigable placeholders until their later page milestones are approved: Market store, Help desk, AI voice assistant, Language, and More tools.
 
 ## Design system
 
 The selected direction is **Field Notes**, an agrarian editorial system inspired by field journals and documentary crop photography. It uses oat paper surfaces, botanical green for action and healthy states, quiet clay and sky accents, Fraunces for expressive display typography, and Manrope for readable interface text. Repeated leaf-notch marks, annotation labels, offset cards, and contour-line details create the AgroScan signature.
 
-## Development
+## Frontend development
 
 Install dependencies and start the Vite development server:
 
@@ -40,8 +58,17 @@ pnpm check
 pnpm build
 ```
 
-## Mock boundaries
+The frontend uses local state and sample values for Crop Registration, My Crop Plan, Weather Analysis, and Notifications. Pest/Disease Detection calls `client/src/mock/detectCrop.ts`, which waits 1.5 seconds and returns one of five sample outcomes. No customer data, authentication service, weather provider, or ML model is connected in this frontend milestone.
 
-The Crop Registration, My Crop Plan, Weather Analysis, and Notifications pages use local state and sample values. Pest/Disease Detection calls `client/src/mock/detectCrop.ts`, which intentionally waits 1.5 seconds before returning one of five sample outcomes. No customer data, database records, authentication service, weather provider, or ML model is connected in this frontend milestone.
+## Database quick start
 
-The separate FastAPI, PostgreSQL, JWT, storage, and model-training phase is deferred until the complete frontend is approved and the dataset location, deployment target, and integration requirements are confirmed.
+Refer to the complete [Database Documentation](database/README.md) for architecture, schema details, and backend connection examples.
+
+To initialize the PostgreSQL database in a development environment:
+
+```bash
+psql -U postgres -d agroscan -f database/schema.sql
+psql -U postgres -d agroscan -f database/seed.sql
+```
+
+The separate FastAPI, PostgreSQL, JWT, storage, and model-training phase should be started only after the complete frontend is approved and the dataset location, deployment target, and integration requirements are confirmed.
