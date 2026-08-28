@@ -1,11 +1,11 @@
 {
+  "version": 2,
   "buildCommand": "pnpm run build",
   "outputDirectory": "dist/public",
-  "framework": "vite",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "/api"
     },
     {
       "source": "/(.*)",

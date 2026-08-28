@@ -85,7 +85,22 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error("Fatal AgroScan server startup error:", err);
-  process.exit(1);
-});
+// Start standalone HTTP listener if run directly (Render / Docker / local), but not in Vercel serverless mode
+const isMainModule =
+  process.argv[1] &&
+  !process.env.VERCEL &&
+  (
+    process.argv[1].endsWith("dist/index.js") ||
+    process.argv[1].endsWith("dist\\index.js") ||
+    process.argv[1].endsWith("server/index.ts") ||
+    process.argv[1].endsWith("server\\index.ts") ||
+    process.argv[1].endsWith("server/index.js") ||
+    process.argv[1].endsWith("server\\index.js")
+  );
+
+if (isMainModule || process.env.AUTO_START_SERVER === "true") {
+  startServer().catch((err) => {
+    console.error("Fatal AgroScan server startup error:", err);
+    process.exit(1);
+  });
+}
