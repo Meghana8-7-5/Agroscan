@@ -27,15 +27,25 @@ export const pool = new pg.Pool({
   connectionTimeoutMillis: 10_000,
 });
 
+pool.on("error", (err) => {
+  console.warn("[DATABASE POOL WARNING] Idle client error or connection reset:", err.message || err);
+});
+
 export async function query(text, params) {
-  return pool.query(text, params);
+  try {
+    return await pool.query(text, params);
+  } catch (err) {
+    console.warn(`[DATABASE QUERY WARNING] ${err.message || err}`);
+    throw err;
+  }
 }
 
 export async function checkDbConnection() {
   try {
     await pool.query("SELECT 1");
     return true;
-  } catch {
+  } catch (err) {
+    console.warn(`[DB HEALTH] Database currently unreachable (${err.message || err}).`);
     return false;
   }
 }

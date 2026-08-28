@@ -32,18 +32,28 @@ export const pool = new Pool({
   connectionTimeoutMillis: 10_000,
 });
 
+pool.on("error", (err) => {
+  console.warn("[DATABASE POOL WARNING] Idle client error or connection reset:", err.message || err);
+});
+
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   text: string,
   params?: unknown[],
 ) {
-  return pool.query<T>(text, params);
+  try {
+    return await pool.query<T>(text, params);
+  } catch (err: any) {
+    console.warn(`[DATABASE QUERY WARNING] ${err.message || err}`);
+    throw err;
+  }
 }
 
 export async function checkDbConnection(): Promise<boolean> {
   try {
     await pool.query("SELECT 1");
     return true;
-  } catch {
+  } catch (err: any) {
+    console.warn(`[DB HEALTH] Database currently unreachable (${err.message || err}). Running with fallback stores.`);
     return false;
   }
 }
