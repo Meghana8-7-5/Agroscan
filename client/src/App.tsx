@@ -7,6 +7,14 @@ import { useState } from "react";
 import { Link, Route, Switch } from "wouter";
 import { ArrowLeft, Leaf } from "lucide-react";
 import Home from "./pages/Home";
+import Register from "./pages/Register";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import CropRegistration from "./pages/CropRegistration";
+import MyCropPlan from "./pages/MyCropPlan";
+import PestDetection from "./pages/PestDetection";
+import WeatherAnalysis from "./pages/WeatherAnalysis";
+import Notifications from "./pages/Notifications";
 
 function ComingSoon({ title }: { title: string }) {
   return (
@@ -33,10 +41,20 @@ function App() {
     <div className={theme === "dark" ? "dark" : ""}>
       <Switch>
         <Route path="/" component={Home} />
-        <Route path="/register"><ComingSoon title="Register" /></Route>
-        <Route path="/login"><ComingSoon title="Login" /></Route>
-        <Route path="/dashboard"><ComingSoon title="Dashboard" /></Route>
-        <Route path="/detection"><ComingSoon title="Scan your crop" /></Route>
+        <Route path="/register" component={Register} />
+        <Route path="/login" component={Login} />
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/crop-registration" component={CropRegistration} />
+        <Route path="/my-crops" component={MyCropPlan} />
+        <Route path="/pest-detection" component={PestDetection} />
+        <Route path="/weather" component={WeatherAnalysis} />
+        <Route path="/notifications" component={Notifications} />
+        <Route path="/market-store"><ComingSoon title="Market store" /></Route>
+        <Route path="/help-desk"><ComingSoon title="Help desk" /></Route>
+        <Route path="/ai-voice-assistant"><ComingSoon title="AI voice assistant" /></Route>
+        <Route path="/language"><ComingSoon title="Language" /></Route>
+        <Route path="/more-tools"><ComingSoon title="More tools" /></Route>
+        <Route path="/detection" component={PestDetection} />
         <Route path="/about"><ComingSoon title="About AgroScan" /></Route>
         <Route path="/services"><ComingSoon title="Services" /></Route>
         <Route path="/disease-library"><ComingSoon title="Disease Library" /></Route>
