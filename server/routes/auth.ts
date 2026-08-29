@@ -309,8 +309,13 @@ router.post("/login", async (req, res) => {
       }>(
         isEmail
           ? "SELECT * FROM users WHERE LOWER(email) = LOWER($1)"
-          : "SELECT * FROM users WHERE phone_number = $1",
-        [isEmail ? trimmed : phoneNumber],
+          : "SELECT * FROM users WHERE phone_number = $1 OR phone_number = $2 OR phone_number = $3 OR RIGHT(REGEXP_REPLACE(phone_number, '[^0-9]', '', 'g'), 10) = $4",
+        [
+          isEmail ? trimmed : phoneNumber,
+          trimmed,
+          `+91${trimmed.replace(/\D/g, "")}`,
+          trimmed.replace(/\D/g, "").slice(-10),
+        ],
       );
 
       const dbUser = result.rows[0];
@@ -345,11 +350,16 @@ router.post("/login", async (req, res) => {
     }
 
     // 2. Check in-memory store
-    const memUser = inMemoryUsers.find(
-      (u) =>
-        (isEmail && u.email && u.email.toLowerCase() === trimmed) ||
-        (!isEmail && (u.phone_number === phoneNumber || u.phone_number === trimmed)),
-    );
+    const digits = trimmed.replace(/\D/g, "");
+    const memUser = inMemoryUsers.find((u) => {
+      if (isEmail) return u.email && u.email.toLowerCase() === trimmed;
+      const uDigits = (u.phone_number || "").replace(/\D/g, "");
+      return (
+        u.phone_number === phoneNumber ||
+        u.phone_number === trimmed ||
+        (digits.length >= 10 && uDigits.endsWith(digits.slice(-10)))
+      );
+    });
 
     if (memUser && memUser.is_active) {
       const valid = await bcrypt.compare(password, memUser.password_hash);
