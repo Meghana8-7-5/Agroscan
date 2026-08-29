@@ -71,12 +71,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const me = await authApi.me();
-        if (!cancelled) {
+        if (!cancelled && me && me.id) {
           setUser(me);
           localStorage.setItem(USER_KEY, JSON.stringify(me));
         }
       } catch {
-        if (!cancelled) logout();
+        if (!cancelled) {
+          const stored = localStorage.getItem(USER_KEY);
+          if (stored && stored !== "undefined") {
+            try {
+              const parsed = JSON.parse(stored);
+              if (parsed && parsed.id) {
+                setUser(parsed);
+              } else {
+                logout();
+              }
+            } catch {
+              logout();
+            }
+          } else {
+            logout();
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
