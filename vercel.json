@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm install && pnpm run vercel-build",
+  "buildCommand": "pnpm install --no-frozen-lockfile && vite build",
   "outputDirectory": "dist/public",
   "framework": "vite",
   "rewrites": [
