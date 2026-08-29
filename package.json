@@ -10,7 +10,7 @@
     "build:client": "vite build",
     "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "vercel-build": "vite build",
+    "vercel-build": "pnpm install && vite build",
     "render:build": "pnpm install && pnpm build && pnpm db:setup",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "preview": "vite preview --host",
