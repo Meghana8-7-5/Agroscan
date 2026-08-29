@@ -1,7 +1,7 @@
 {
-  "buildCommand": "pnpm run build",
+  "buildCommand": "pnpm run vercel-build",
   "outputDirectory": "dist/public",
-  "cleanUrls": true,
+  "framework": "vite",
   "rewrites": [
     {
       "source": "/api/:path*",
