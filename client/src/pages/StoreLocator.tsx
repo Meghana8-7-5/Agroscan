@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   ArrowLeft,
@@ -12,125 +12,113 @@ import {
   Tag,
   LocateFixed,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  LoaderCircle,
+  Building2,
+  ExternalLink
 } from "lucide-react";
-import { AGRI_STORES, AgriStore } from "../data/cropsDatabase";
 import { useLocationContext } from "../contexts/LocationContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import EditableFrame from "../components/EditableFrame";
 import { MapView } from "../components/Map";
 
-type StoreWithDistance = AgriStore & { computedDistanceKm: number };
-
-function calculateHaversineDistanceKm(
-  lat1: number | null,
-  lon1: number | null,
-  lat2: number,
-  lon2: number
-): number {
-  if (!lat1 || !lon1) return 5.0; // default estimate
-  const R = 6371; // Radius of earth in kilometers
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const dist = R * c;
-  return Math.round(dist * 10) / 10;
+export interface AgriStoreItem {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  latitude: number;
+  longitude: number;
+  distanceKm?: number;
+  stockedChemicals: string[];
+  isOpen: boolean;
+  dealerType: string;
 }
 
 const STORE_PAGE_STRINGS: Record<string, Record<string, string>> = {
   eyebrow: {
-    en: "Nearby Inputs & Stock Availability",
-    te: "దగ్గరలోని ఎరువుల దుకాణాలు & స్టాక్ లభ్యత",
-    hi: "नजदीकी कृषि दुकानें और स्टॉक उपलब्धता",
-    ta: "அருகிலுள்ள வேளாண் கடைகள் மற்றும் இருப்பு",
-    kn: "ಹತ್ತಿರದ ಕೃಷಿ ಮಳಿಗೆಗಳು ಮತ್ತು ದಾಸ್ತಾನು",
-    mr: "जवळपासची कृषी दुकाने आणि साठा उपलब्धता",
-    pa: "ਨੇੜਲੀਆਂ ਖੇਤੀ ਦੁਕਾਨਾਂ ਅਤੇ ਸਟਾਕ",
-    bn: "নিকটবর্তী কৃষি দোকান এবং স্টক",
-    gu: "નજીકની કૃષિ દુકાનો અને સ્ટોક ઉપલબ્ધતા",
-    ml: "അടുത്തുള്ള കാർഷിക കടകളും സ്റ്റോക്കും",
+    en: "Verified Agricultural Input Dealers",
+    te: "ధృవీకరించబడిన స్థానిక ఎరువులు & పురుగుమందుల డీలర్లు",
+    hi: "सत्यापित कृषि इनपुट व कीटनाशक डीलर",
+    ta: "சரிபார்க்கப்பட்ட வேளாண் உள்ளீட்டு விநியோகஸ்தர்கள்",
+    kn: "ದೃಢೀಕರಿಸಿದ ಕೃಷಿ ಪರಿಕರಗಳ ವಿತರಕರು",
+    mr: "सत्यापित कृषी केंद्र व खत विक्रेते",
+    pa: "ਤਸਦੀਕਸ਼ੁਦਾ ਖੇਤੀਬਾੜੀ ਡੀਲਰ",
+    bn: "যাচাইকৃত কৃষি সার ও কীটনাশক বিক্রেতা",
+    gu: "ચકાસાયેલ કૃષિ ડીલરો",
+    ml: "പരിശോധിച്ചുറപ്പിച്ച കാർഷിക ഡീലർമാർ",
   },
   main_heading: {
-    en: "Find Chemicals & Fertilizer Stores",
-    te: "పురుగుమందులు & ఎరువుల దుకాణాలను కనుగొనండి",
-    hi: "रासायनिक दवाइयां और खाद की दुकानें खोजें",
-    ta: "உரங்கள் மற்றும் பூச்சிக்கொல்லி கடைகளைக் கண்டறியவும்",
-    kn: "ರಾಸಾಯನಿಕ ಮತ್ತು ಗೊಬ್ಬರ ಮಳಿಗೆಗಳನ್ನು ಹುಡುಕಿ",
-    mr: "रासायनिक व खतांची दुकाने शोधा",
-    pa: "ਦਵਾਈਆਂ ਅਤੇ ਖਾਦ ਦੀਆਂ ਦੁਕਾਨਾਂ ਲੱਭੋ",
-    bn: "কীটনাশক এবং সারের দোকান খুঁজুন",
-    gu: "જંતુનાશક અને ખાતરની દુકાનો શોધો",
-    ml: "വളവും കീടനാശിനിയും വിൽക്കുന്ന കടകൾ കണ്ടെത്തുക",
+    en: "Nearby Fertilizer & Pesticide Stores",
+    te: "దగ్గరలోని ఎరువులు, విత్తనాలు & రసాయనాల కేంద్రాలు",
+    hi: "नजदीकी खाद, बीज और कीटनाशक केंद्र",
+    ta: "அருகிலுள்ள உரம், விதை மற்றும் பூச்சிக்கொல்லி கடைகள்",
+    kn: "ಹತ್ತಿರದ ಗೊಬ್ಬರ, ಬೀಜ ಮತ್ತು ಕೀಟನಾಶಕ ಮಳಿಗೆಗಳು",
+    mr: "जवळपासची खत, बी-बियाणे आणि कीटकनाशक दुकाने",
+    pa: "ਨੇੜਲੀਆਂ ਖਾਦ, ਬੀਜ ਅਤੇ ਕੀਟਨਾਸ਼ਕਾਂ ਦੀਆਂ ਦੁਕਾਨਾਂ",
+    bn: "নিকটবর্তী সার, বীজ এবং কীটনাশকের দোকান",
+    gu: "નજીકની ખાતર, બિયારણ અને જંતુનાશકની દુકાનો",
+    ml: "അടുത്തുള്ള വളം, വിത്ത്, കീടനാശിനി കടകൾ",
   },
   stocked_label: {
-    en: "Chemicals Stocked",
-    te: "మందులు అందుబాటులో ఉన్నాయి",
-    hi: "दवाइयां स्टॉक में हैं",
-    ta: "மருந்துகள் இருப்பில் உள்ளன",
-    kn: "ಔಷಧಗಳು ದಾಸ್ತಾನಿನಲ್ಲಿವೆ",
-    mr: "औषधे साठ्यात उपलब्ध",
-    pa: "ਦਵਾਈਆਂ ਸਟਾਕ ਵਿੱਚ ਹਨ",
-    bn: "ওষুধ স্টকে আছে",
-    gu: "દવાઓ સ્ટોકમાં છે",
-    ml: "മരുന്നുകൾ സ്റ്റോക്കുണ്ട്",
+    en: "Chemicals & Inputs Stocked",
+    te: "అందుబాటులో ఉన్న ఎరువులు & మందులు",
+    hi: "स्टॉक में उपलब्ध दवाइयां व खाद",
+    ta: "இருப்பில் உள்ள உள்ளீடுகள்",
+    kn: "ದಾಸ್ತಾನಿನಲ್ಲಿರುವ ಔಷಧಗಳು",
+    mr: "उपलब्ध कृषी औषधे व खते",
+    pa: "ਸਟਾਕ ਵਿੱਚ ਉਪਲਬਧ ਦਵਾਈਆਂ",
+    bn: "স্টকে উপলব্ধ সার ও কীটনাশক",
+    gu: "સ્ટોકમાં ઉપલબ્ધ ખાતર-દવાઓ",
+    ml: "ലഭ്യമായ വളങ്ങളും മരുന്നുകളും",
   },
-  live_stock_title: {
-    en: "Live Chemical & Brand Stock",
-    te: "ప్రత్యక్ష రసాయన & బ్రాండ్ స్టాక్ వివరాలు",
-    hi: "लाइव दवाइयां और ब्रांड स्टॉक विवरण",
-    ta: "நேரடி ரசாயன மற்றும் பிராண்ட் இருப்பு",
-    kn: "ನೇರ ರಾಸಾಯನಿಕ ಮತ್ತು ಬ್ರಾಂಡ್ ದಾಸ್ತಾನು",
-    mr: "थेट रासायनिक आणि ब्रँड साठा",
-    pa: "ਲਾਈਵ ਕੈਮੀਕਲ ਅਤੇ ਬ੍ਰਾਂਡ ਸਟਾਕ",
-    bn: "লাইভ রাসায়নিক ও ব্র্যান্ড স্টক",
-    gu: "લાઇવ રાસાયણિક અને બ્રાન્ડ સ્ટોક",
-    ml: "തത്സമയ രാസ-ബ്രാൻഡ് സ്റ്റോക്ക്",
-  }
 };
 
 export default function StoreLocator() {
-  const { location, requestGpsLocation, setShowLocationModal } = useLocationContext();
+  const { location, requestGpsLocation, refreshLocation, isLocating } = useLocationContext();
   const { language, t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
-  const [radiusFilter, setRadiusFilter] = useState<number>(10);
-  const [selectedStore, setSelectedStore] = useState<StoreWithDistance | null>(null);
+  const [stores, setStores] = useState<AgriStoreItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fallbackMessage, setFallbackMessage] = useState<string | null>(null);
 
   const str = (key: keyof typeof STORE_PAGE_STRINGS): string => {
     return STORE_PAGE_STRINGS[key]?.[language] || STORE_PAGE_STRINGS[key]?.en || "";
   };
 
-  // Compute live distance in km for all stores from single source of truth location
-  const storesWithDistance = AGRI_STORES.map((store) => {
-    const dist = calculateHaversineDistanceKm(
-      location.latitude,
-      location.longitude,
-      store.latitude,
-      store.longitude
-    );
-    return { ...store, computedDistanceKm: dist };
-  }).sort((a, b) => a.computedDistanceKm - b.computedDistanceKm);
+  const fetchNearbyStores = async () => {
+    setLoading(true);
+    try {
+      const lat = location.latitude || 16.3067;
+      const lng = location.longitude || 80.4365;
 
-  // Filter stores by radius and search query
-  const filteredStores = storesWithDistance.filter((store) => {
-    const matchesRadius = store.computedDistanceKm <= radiusFilter;
-    const matchesName =
-      store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      store.village.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesChemical = store.stockedChemicals.some(
-      (c) =>
-        c.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.brandName.toLowerCase().includes(searchQuery.toLowerCase())
+      const res = await fetch(`/api/stores/nearby?lat=${lat}&lng=${lng}&radius=25000`);
+      if (res.ok) {
+        const data = await res.json();
+        setStores(data.stores || []);
+        setFallbackMessage(data.fallbackMessage || null);
+      }
+    } catch (err) {
+      console.warn("Stores fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNearbyStores();
+  }, [location.latitude, location.longitude]);
+
+  const filteredStores = stores.filter((store) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      store.name.toLowerCase().includes(q) ||
+      store.address.toLowerCase().includes(q) ||
+      store.dealerType.toLowerCase().includes(q) ||
+      store.stockedChemicals.some((c) => c.toLowerCase().includes(q))
     );
-    return matchesRadius && (matchesName || matchesChemical);
   });
-
-  const activeStore = filteredStores.find((s) => selectedStore && s.id === selectedStore.id) || filteredStores[0] || storesWithDistance[0];
 
   return (
     <main className="workspace-page min-h-screen bg-[#f7f8f4] text-[#1c3827]">
@@ -143,227 +131,150 @@ export default function StoreLocator() {
           <EditableFrame id="store_header_icon" className="h-8 w-8 rounded-xl bg-[#2f6b45] text-white">
             <Store size={18} />
           </EditableFrame>
-          <span>{t("stores_near_me")}</span>
+          <span>{t("store_locator")}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={requestGpsLocation}
-            className="text-xs font-extrabold uppercase tracking-wider text-[#2f6b45] bg-[#e5eddc] px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-[#d5e4c8] cursor-pointer"
-            title="Refresh GPS Location"
-          >
-            <RefreshCw size={13} /> {t("refresh_location")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowLocationModal(true)}
-            className="text-xs font-extrabold uppercase tracking-wider text-white bg-[#2f6b45] px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-[#225033] cursor-pointer"
-          >
-            <LocateFixed size={13} /> {location.villageCity}, {location.district}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            refreshLocation();
+            fetchNearbyStores();
+          }}
+          disabled={isLocating}
+          className="rounded-full bg-white border border-[#cbd8bf] px-4 py-1.5 text-xs font-bold text-[#2f6b45] hover:bg-[#eef4e7] flex items-center gap-1.5 shadow-sm cursor-pointer"
+        >
+          <RefreshCw size={13} className={isLocating ? "animate-spin" : ""} />
+          <span>Update GPS</span>
+        </button>
       </header>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Location Status / Error Banner */}
-        {!location.isGps && (
-          <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-900 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle size={18} className="text-amber-600 flex-shrink-0" />
-              <span>
-                {t("location_unavailable")}: <strong>{location.villageCity}, {location.district}</strong>
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={requestGpsLocation}
-              className="rounded-xl bg-amber-600 px-3 py-1 text-xs font-bold text-white shadow hover:bg-amber-700 cursor-pointer"
-            >
-              {t("enable_gps")}
-            </button>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+        {/* Title */}
+        <EditableFrame id="store_page_heading" isTextOnly>
+          <div className="space-y-1">
+            <p className="text-xs font-extrabold uppercase tracking-widest text-[#2f6b45]">
+              {str("eyebrow")}
+            </p>
+            <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#193625]">
+              {str("main_heading")}
+            </h1>
+            <p className="text-sm text-[#4d6957]">
+              Real agricultural shops and Rythu Bharosa Kendra (RBK) depots near <strong>{location.villageCity || "Gowdapalem"}</strong>, <strong>{location.district || "Guntur"}</strong>.
+            </p>
+          </div>
+        </EditableFrame>
+
+        {/* Honest Fallback Alert (if remote area) */}
+        {fallbackMessage && (
+          <div className="rounded-2xl bg-amber-50 border border-amber-300 p-4 text-xs text-amber-900 flex items-center gap-3">
+            <AlertTriangle size={18} className="text-amber-700 shrink-0" />
+            <span>{fallbackMessage}</span>
           </div>
         )}
 
-        {/* Title */}
-        <div className="mb-8">
-          <p className="text-xs font-extrabold uppercase tracking-widest text-[#2f6b45]">{str("eyebrow")}</p>
-          <h1 className="mt-1 font-display text-3xl sm:text-4xl font-extrabold text-[#193625]">{str("main_heading")}</h1>
-          <p className="mt-2 text-sm text-[#4d6957]">
-            {location.villageCity}, {location.district}
-          </p>
-        </div>
-
-        {/* Search & Radius Filter Controls */}
-        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="relative flex-1 max-w-2xl">
-            <Search size={20} className="absolute left-4 top-3.5 text-[#5e7867]" />
+        {/* Search Bar */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5a7b66]" />
             <input
               type="text"
-              placeholder={t("search_placeholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-2xl border border-[#d5ded0] bg-white pl-12 pr-4 py-3.5 text-sm font-medium text-[#1c3827] placeholder:text-[#8aa091] focus:border-[#2f6b45] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/20 shadow-sm"
+              placeholder="Search by store name, chemical (e.g. Coragen, Urea, Mancozeb), or town…"
+              className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-10 pr-4 py-3 text-xs font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 shadow-sm"
             />
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#20402e]">{t("search_radius")}:</span>
-            <div className="flex items-center rounded-xl bg-white p-1 border border-[#d5ded0] shadow-sm">
-              {[10, 25, 50].map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRadiusFilter(r)}
-                  className={`rounded-lg px-3 py-1 text-xs font-extrabold transition-all cursor-pointer ${
-                    radiusFilter === r ? "bg-[#2f6b45] text-white shadow" : "text-[#34543e] hover:bg-[#eef4e6]"
-                  }`}
-                >
-                  {r} km
-                </button>
-              ))}
-            </div>
-          </div>
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="rounded-2xl bg-white border border-[#cbd8bf] px-4 py-3 text-xs font-bold text-[#456b52] hover:bg-[#edf4e6] cursor-pointer"
+            >
+              Clear
+            </button>
+          )}
         </div>
 
-        {/* Main Grid: Left Store List, Right Store Details & Interactive Map */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-          {/* Store List */}
-          <div className="lg:col-span-5 space-y-4">
-            <h2 className="text-xs font-extrabold uppercase tracking-wider text-[#2f6b45] flex items-center justify-between">
-              <span className="flex items-center gap-1"><MapPin size={15} /> {t("nearby_dealers")} ({filteredStores.length})</span>
-              <span>{t("sorted_by_distance")}</span>
-            </h2>
-
-            {filteredStores.length === 0 ? (
-              <div className="rounded-2xl border border-[#d5ded0] bg-white p-6 text-center text-xs text-[#52705d]">
-                {t("no_stores_found", { radius: String(radiusFilter) })}
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[650px] overflow-y-auto pr-1">
-                {filteredStores.map((store) => (
-                  <button
-                    key={store.id}
-                    type="button"
-                    onClick={() => setSelectedStore(store)}
-                    className={`w-full text-left rounded-2xl border p-5 transition-all cursor-pointer ${
-                      activeStore.id === store.id
-                        ? "border-[#2f6b45] bg-[#eef4e8] shadow-md ring-2 ring-[#2f6b45]/20"
-                        : "border-[#d8e0cc] bg-white hover:bg-[#f3f7ee] hover:border-[#b8c9a9]"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-display text-base font-bold text-[#1a3826] flex items-center gap-2">
-                        <EditableFrame id={`store_list_icon_${store.id}`} className="h-6 w-6 rounded-lg bg-emerald-100 text-[#2f6b45]">
-                          <Store size={14} />
-                        </EditableFrame>
-                        {store.name}
-                      </h3>
-                      <span className="rounded-full bg-[#2f6b45] text-white px-2.5 py-0.5 text-xs font-bold shadow-sm">
-                        {store.computedDistanceKm} km
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs font-medium text-[#52705d]">
-                      {store.ownerName} · {store.village}, {store.district}
-                    </p>
-
-                    <div className="mt-3 flex items-center gap-2 text-xs font-bold text-[#2e523b]">
-                      <Tag size={13} /> {store.stockedChemicals.length} {str("stocked_label")}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+        {/* Stores Grid */}
+        {loading ? (
+          <div className="rounded-3xl border border-[#d8e0cc] bg-white p-12 text-center space-y-3">
+            <LoaderCircle size={36} className="animate-spin text-[#2f6b45] mx-auto" />
+            <p className="text-xs font-bold text-[#456b52]">Querying nearby registered agri input centers…</p>
           </div>
-
-          {/* Store Details & Map */}
-          <div className="lg:col-span-7 space-y-6">
-            {activeStore && (
-              <div className="rounded-3xl border border-[#d8e0cc] bg-white p-6 shadow-xl sm:p-8">
-                <div className="border-b border-[#e1e8d7] pb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-[#2f6b45] bg-[#e5eddc] px-3 py-1 rounded-full">
-                      {t("distance_km", { dist: String(activeStore.computedDistanceKm) })}
+        ) : filteredStores.length === 0 ? (
+          <div className="rounded-3xl border border-[#d8e0cc] bg-white p-12 text-center space-y-2">
+            <Store size={36} className="text-[#648471] mx-auto" />
+            <h4 className="font-display text-base font-bold text-[#183624]">No stores found matching your query</h4>
+            <p className="text-xs text-[#52705d]">Try searching for a generic input like "Urea" or clear the search filter.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredStores.map((store) => (
+              <EditableFrame
+                key={store.id}
+                id={`store_card_${store.id}`}
+                className="rounded-3xl border border-[#d8e0cc] bg-white p-6 shadow-md flex flex-col justify-between hover:shadow-xl hover:border-[#2f6b45] transition-all space-y-4"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="rounded-full bg-[#e5eddc] px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-[#2f6b45]">
+                      {store.dealerType}
                     </span>
-                    <h2 className="mt-2 font-display text-2xl font-bold text-[#163322]">{activeStore.name}</h2>
-                    <p className="mt-1 text-xs text-[#4b6957] font-semibold">
-                      {activeStore.ownerName} · {activeStore.village}, {activeStore.district}
-                    </p>
+                    {store.distanceKm !== undefined && (
+                      <span className="rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 px-2.5 py-0.5 text-xs font-extrabold flex items-center gap-1">
+                        <Navigation size={11} className="text-emerald-700" /> {store.distanceKm} km
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={`tel:${activeStore.phone}`}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#2f6b45] px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-[#235334] no-underline"
-                    >
-                      <PhoneCall size={15} /> {t("call_store")}
-                    </a>
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${activeStore.latitude},${activeStore.longitude}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl border border-[#b9cbab] bg-[#f0f6ea] px-4 py-2.5 text-xs font-bold text-[#274934] hover:bg-[#e4eedb] no-underline"
-                    >
-                      <Navigation size={15} /> {t("directions")}
-                    </a>
-                  </div>
-                </div>
-
-                {/* Interactive Map Preview */}
-                <div className="mt-6 overflow-hidden rounded-2xl border border-[#dce5d2] shadow-inner">
-                  <MapView
-                    className="w-full h-[280px]"
-                    initialCenter={{ lat: activeStore.latitude, lng: activeStore.longitude }}
-                    initialZoom={14}
-                  />
-                </div>
-
-                {/* Stock Inventory Table */}
-                <div className="mt-6">
-                  <h3 className="font-display text-lg font-bold text-[#183624] mb-3 flex items-center gap-2">
-                    <Tag size={18} className="text-[#2f6b45]" /> {str("live_stock_title")}
+                  <h3 className="font-display text-lg font-bold text-[#183624] leading-snug">
+                    {store.name}
                   </h3>
 
-                  <div className="overflow-x-auto rounded-2xl border border-[#e1e8d7]">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-[#f0f5eb] text-[#284935] font-extrabold uppercase border-b border-[#e1e8d7]">
-                        <tr>
-                          <th className="px-4 py-3">{t("product_chemical")}</th>
-                          <th className="px-4 py-3">{t("brand_name")}</th>
-                          <th className="px-4 py-3">{t("price_per_unit")}</th>
-                          <th className="px-4 py-3">{t("stock_status")}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#e6edd9] bg-white font-medium text-[#213f2c]">
-                        {activeStore.stockedChemicals.map((item, idx) => (
-                          <tr key={idx} className="hover:bg-[#f9faf7]">
-                            <td className="px-4 py-3 font-bold">{item.productName}</td>
-                            <td className="px-4 py-3">
-                              <span className="rounded-lg bg-[#e3eed9] px-2.5 py-0.5 font-bold text-[#274b34]">
-                                {item.brandName}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 font-bold text-[#1e3b29]">{item.pricePerUnit}</td>
-                            <td className="px-4 py-3">
-                              {item.inStock ? (
-                                <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
-                                  <CheckCircle size={14} /> {t("in_stock")}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 font-bold text-rose-600">
-                                  <XCircle size={14} /> {t("out_of_stock")}
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="flex items-start gap-1.5 text-xs text-[#52705d] mt-2">
+                    <MapPin size={14} className="shrink-0 text-[#2f6b45] mt-0.5" />
+                    <span>{store.address}</span>
+                  </div>
+
+                  {/* Stocked Chemicals Tags */}
+                  <div className="mt-4 pt-3 border-t border-[#e5edd8] space-y-1.5">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#2f6b45] block">
+                      {str("stocked_label")}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {store.stockedChemicals.map((chem, idx) => (
+                        <span
+                          key={idx}
+                          className="rounded-lg bg-[#f4f7ee] border border-[#d6e3cb] px-2 py-0.5 text-[11px] font-semibold text-[#294c36]"
+                        >
+                          {chem}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+
+                {/* Card Footer: Call & Google Maps Navigation */}
+                <div className="pt-3 border-t border-[#e5edd8] flex items-center justify-between gap-2 text-xs">
+                  <a
+                    href={`tel:${store.phone.replace(/\s+/g, "")}`}
+                    className="rounded-xl border border-[#cbd8bf] bg-white px-3.5 py-2 font-bold text-[#1c3827] hover:bg-[#f3f7ee] flex items-center gap-1.5 no-underline"
+                  >
+                    <PhoneCall size={13} className="text-[#2f6b45]" /> Call Shop
+                  </a>
+
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-xl bg-[#2f6b45] px-3.5 py-2 font-bold text-white hover:bg-[#20492f] flex items-center gap-1.5 no-underline shadow-sm"
+                  >
+                    <Navigation size={13} /> Get Directions
+                  </a>
+                </div>
+              </EditableFrame>
+            ))}
           </div>
-        </div>
+        )}
       </div>
     </main>
   );

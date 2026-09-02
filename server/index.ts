@@ -18,6 +18,7 @@ const __dirname = path.dirname(__filename);
 import uiConfigRoutes from "./routes/uiConfig.js";
 import aiAssistantRoutes from "./routes/aiAssistant.js";
 import supportRoutes from "./routes/support.js";
+import storesRoutes from "./routes/stores.js";
 
 export function createApp() {
   const app = express();
@@ -52,6 +53,7 @@ export function createApp() {
   app.use("/api/ui-config", uiConfigRoutes);
   app.use("/api/ai", aiAssistantRoutes);
   app.use("/api/support", supportRoutes);
+  app.use("/api/stores", storesRoutes);
 
   const staticPath =
     process.env.NODE_ENV === "production"

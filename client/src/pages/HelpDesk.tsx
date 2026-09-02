@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, FormEvent } from "react";
 import { Link } from "wouter";
 import {
   HelpCircle,
@@ -19,7 +19,10 @@ import {
   RefreshCw,
   Wheat,
   ShieldAlert,
-  ChevronRight
+  ChevronRight,
+  Info,
+  Layers,
+  MapPin
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -37,16 +40,91 @@ interface ChatMessage {
 }
 
 const HELPDESK_STRINGS: Record<string, Record<string, string>> = {
-  eyebrow: { en: "24/7 Farmer Advisory & Escalations", te: "24/7 రైతు సలహా & సహాయ కేంద్రం", hi: "24/7 किसान सलाह व सहायता केंद्र", ta: "24/7 விவசாய ஆலோசனை மையம்", kn: "24/7 ರೈತ ಸಲಹಾ ಕೇಂದ್ರ", mr: "24/7 शेतकरी सल्ला केंद्र", pa: "24/7 ਕਿਸਾਨ ਸਲਾਹ ਕੇਂਦਰ", bn: "২৪/৭ কৃষক পরামর্শ কেন্দ্র", gu: "24/7 ખેડૂત સલાહ કેન્દ્ર", ml: "24/7 കർഷക സഹായ കേന്ദ്രം" },
-  title: { en: "How can we assist your farm today?", te: "ఈ రోజు మీ పొలానికి ఏ విధంగా సహాయపడగలం?", hi: "आज हम आपके खेत की क्या सहायता कर सकते हैं?", ta: "இன்று உங்கள் பண்ணைக்கு நாங்கள் எவ்வாறு உதவலாம்?", kn: "ಇಂದು ನಿಮ್ಮ ಕೃಷಿಗೆ ನಾವು ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?", mr: "आज आम्ही तुमच्या शेतीला कशी मदत करू शकतो?", pa: "ਅੱਜ ਅਸੀਂ ਤੁਹਾਡੇ ਖੇਤ ਦੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦੇ ਹਾਂ?", bn: "আজ আপনার খামারে আমরা কীভাবে সাহায্য করতে পারি?", gu: "આજે અમે તમારા ખેતરને કેવી રીતે મદદ કરી શકીએ?", ml: "ഇന്ന് നിങ്ങളുടെ കൃഷിക്ക് എന്ത് സഹായമാണ് വേണ്ടത്?" },
-  tab_ai: { en: "Instant AI Advisor", te: "తక్షణ AI సలహాదారు", hi: "त्वरित AI सलाहकार", ta: "உடனடி AI ஆலோசகர்", kn: "ತಕ್ಷಣದ AI ಸಲಹೆಗಾರ", mr: "झटपट AI सल्लागार", pa: "ਤੁਰੰਤ AI ਸਲਾਹਕਾਰ", bn: "তাৎক্ষণিক AI পরামর্শক", gu: "ત્વરિત AI સલાહકાર", ml: "തൽക്ഷണ AI ഉപദേശകൻ" },
-  tab_report: { en: "Report Problem to Admin", te: "సమస్యను నివేదించండి", hi: "समस्या दर्ज करें", ta: "சிக்கலைப் புகாரளிக்கவும்", kn: "ಸಮಸ್ಯೆ ವರದಿ ಮಾಡಿ", mr: "समस्या नोंदवा", pa: "ਸਮੱਸਿਆ ਦਰਜ ਕਰੋ", bn: "সমস্যা রিপোর্ট করুন", gu: "સમસ્યા નોંધાવો", ml: "പ്രശ്നം റിപ്പോർട്ട് ചെയ്യുക" },
-  tab_gov: { en: "Govt Agronomist (Gram Sachivalayam)", te: "ప్రభుత్వ వ్యవసాయ అధికారి (రైతు భరోసా కేంద్రం)", hi: "सरकारी कृषि अधिकारी (ग्राम सचिवालय)", ta: "அரசு வேளாண் அதிகாரி", kn: "ಸರ್ಕಾರಿ ಕೃಷಿ ಅಧಿಕಾರಿ (ಗ್ರಾಮ ಸಚಿವಾಲಯ)", mr: "सरकारी कृषी अधिकारी", pa: "ਸਰਕਾਰੀ ਖੇਤੀਬਾੜੀ ਅਧਿਕਾਰੀ", bn: "সরকারি কৃষি কর্মকর্তা", gu: "સરકારી કૃષિ અધિકારી", ml: "സർക്കാർ കൃഷി ഓഫീസർ" },
-  tab_tickets: { en: "My Support Tickets", te: "నా సమస్యల రికార్డులు", hi: "मेरी सहायता टिकट", ta: "எனது புகார்கள்", kn: "ನನ್ನ ದೂರುಗಳು", mr: "माझ्या तक्रारी", pa: "ਮੇਰੀਆਂ ਟਿਕਟਾਂ", bn: "আমার অভিযোগ", gu: "મારી ફરિયાદ", ml: "എന്റെ ടിക്കറ്റുകൾ" },
-  ask_placeholder: { en: "Ask any farming or crop care question in your language...", te: "మీ పంట లేదా పురుగుల నివారణ గురించి ఏదైనా అడగండి...", hi: "अपनी फसल या कीट नियंत्रण के बारे में कोई भी प्रश्न पूछें...", ta: "உங்கள் பயிர் குறித்த கேள்விகளைக் கேளுங்கள்...", kn: "ನಿಮ್ಮ ಬೆಳೆ ಬಗ್ಗೆ ಯಾವುದೇ ಪ್ರಶ್ನೆ ಕೇಳಿ...", mr: "तुमच्या पिकाबद्दल कोणताही प्रश्न विचारा...", pa: "ਆਪਣੀ ਫਸਲ ਬਾਰੇ ਕੋਈ ਵੀ ਸਵਾਲ ਪੁੱਛੋ...", bn: "ফসল সংক্রান্ত প্রশ্ন জিজ্ঞাসা করুন...", gu: "પાક અંગે કોઈ પ્રશ્ન પૂછો...", ml: "കൃഷി സംബന്ധമായ ചോദ്യങ്ങൾ ചോദിക്കുക..." },
-  send: { en: "Send", te: "పంపండి", hi: "भेजें", ta: "அனுப்பு", kn: "ಕಳುಹಿಸಿ", mr: "पाठवा", pa: "ਭੇਜੋ", bn: "পাঠান", gu: "મોકલો", ml: "അയക്കുക" },
-  escalate_btn: { en: "Escalate to Admin", te: "అడ్మిన్‌కు నివేదించండి", hi: "एडमिन को भेजें", ta: "நிர்வாகிக்கு அனுப்பு", kn: "ನಿರ್ವಾಹಕರಿಗೆ ಕಳುಹಿಸಿ", mr: "प्रशासकाकडे पाठवा", pa: "ਐਡਮਿਨ ਨੂੰ ਭੇਜੋ", bn: "অ্যাডমিনকে জানান", gu: "એડમિનને મોકલો", ml: "അഡ്മിന് കൈമാറുക" },
-  submit_ticket: { en: "Submit Problem Report", te: "సమస్యను సమర్పించండి", hi: "समस्या रिपोर्ट जमा करें", ta: "புகாரை சமர்ப்பிக்கவும்", kn: "ದೂರು ಸಲ್ಲಿಸಿ", mr: "तक्रार नोंदवा", pa: "ਰਿਪੋਰਟ ਦਰਜ ਕਰੋ", bn: "রিপোর্ট জমা দিন", gu: "ફરિયાદ સબમિટ કરો", ml: "പരാതി സമർപ്പിക്കുക" }
+  eyebrow: {
+    en: "24/7 Farmer Advisory & Escalations",
+    te: "24/7 రైతు సలహా & సహాయ కేంద్రం",
+    hi: "24/7 किसान सलाह व सहायता केंद्र",
+    ta: "24/7 விவசாய ஆலோசனை மையம்",
+    kn: "24/7 ರೈತ ಸಲಹಾ ಕೇಂದ್ರ",
+    mr: "24/7 शेतकरी सल्ला केंद्र",
+    pa: "24/7 ਕਿਸਾਨ ਸਲਾਹ ਕੇਂਦਰ",
+    bn: "২৪/৭ কৃষক পরামর্শ কেন্দ্র",
+    gu: "24/7 ખેડૂત સલાહ કેન્દ્ર",
+    ml: "24/7 കർഷക സഹായ കേന്ദ്രം",
+  },
+  title: {
+    en: "AgroScan Help Desk & Agronomist Support",
+    te: "ఆగ్రోస్కాన్ హెల్ప్ డెస్క్ & వ్యవసాయ అధికారి సహాయం",
+    hi: "एग्रोस्कैन हेल्प डेस्क व कृषि विशेषज्ञ सहायता",
+    ta: "அக்ரோஸ்கேன் உதவி மையம்",
+    kn: "ಆಗ್ರೋಸ್ಕ್ಯಾನ್ ಸಹಾಯವಾಣಿ",
+    mr: "एग्रोस्कॅन मदत केंद्र",
+    pa: "ਐਗਰੋਸਕੈਨ ਹੈਲਪ ਡੈਸਕ",
+    bn: "এগ্রোস্ক্যান হেল্প ডেস্ক",
+    gu: "એગ્રોસ્કેન સહાયતા કેન્દ્ર",
+    ml: "അഗ്രോസ്കാൻ ഹെൽപ്പ് ഡെസ്ക്",
+  },
+  tab_ai: {
+    en: "AI Crop Advisor",
+    te: "AI పంటల సలహాదారు",
+    hi: "AI फसल सलाहकार",
+    ta: "AI பயிர் ஆலோசகர்",
+    kn: "AI ಬೆಳೆ ಸಲಹೆಗಾರ",
+    mr: "AI पीक सल्लागार",
+    pa: "AI ਫਸਲ ਸਲਾਹਕਾਰ",
+    bn: "AI ফসল পরামর্শক",
+    gu: "AI પાક સલાહકાર",
+    ml: "AI വിള ഉപദേശകൻ",
+  },
+  tab_report: {
+    en: "Report a Website / App Problem",
+    te: "యాప్/వెబ్‌సైట్ సమస్యను నివేదించండి",
+    hi: "वेबसाइट/ऐप समस्या दर्ज करें",
+    ta: "செயலி சிக்கலைப் புகாரளிக்கவும்",
+    kn: "ಆ್ಯಪ್ ಸಮಸ್ಯೆ ವರದಿ ಮಾಡಿ",
+    mr: "अ‍ॅप समस्या नोंदवा",
+    pa: "ਐਪ ਸਮੱਸਿਆ ਦਰਜ ਕਰੋ",
+    bn: "অ্যাপের সমস্যা জানান",
+    gu: "એપ સમસ્યા નોંધાવો",
+    ml: "ആപ്പ് പ്രശ്നം റിപ്പോർട്ട് ചെയ്യുക",
+  },
+  tab_gov: {
+    en: "Govt Agronomist (Gram Sachivalayam / RBK)",
+    te: "ప్రభుత్వ వ్యవసాయ అధికారి (రైతు భరోసా కేంద్రం)",
+    hi: "सरकारी कृषि अधिकारी (ग्राम सचिवालय/RBK)",
+    ta: "அரசு வேளாண் அதிகாரி (RBK)",
+    kn: "ಸರ್ಕಾರಿ ಕೃಷಿ ಅಧಿಕಾರಿ (ಗ್ರಾಮ ಸಚಿವಾಲಯ)",
+    mr: "सरकारी कृषी अधिकारी (RBK)",
+    pa: "ਸਰਕਾਰੀ ਖੇਤੀਬਾੜੀ ਅਧਿਕਾਰੀ",
+    bn: "সরকারি কৃষি কর্মকর্তা",
+    gu: "સરકારી કૃષિ અધિકારી",
+    ml: "സർക്കാർ കൃഷി ഓഫീസർ",
+  },
+  tab_tickets: {
+    en: "My Support Tickets",
+    te: "నా సమస్యల రికార్డులు",
+    hi: "मेरी सहायता टिकट",
+    ta: "எனது புகார்கள்",
+    kn: "ನನ್ನ ದೂರುಗಳು",
+    mr: "माझ्या तक्रारी",
+    pa: "ਮੇਰੀਆਂ ਟਿਕਟਾਂ",
+    bn: "আমার অভিযোগ",
+    gu: "મારી ફરિયાદ",
+    ml: "എന്റെ ടിക്കറ്റുകൾ",
+  },
+  ask_placeholder: {
+    en: "Ask any farming or crop care question in your language...",
+    te: "మీ పంట లేదా పురుగుల నివారణ గురించి ఏదైనా అడగండి...",
+    hi: "अपनी फसल या कीट नियंत्रण के बारे में कोई भी प्रश्न पूछें...",
+    ta: "உங்கள் பயிர் குறித்த கேள்விகளைக் கேளுங்கள்...",
+    kn: "ನಿಮ್ಮ ಬೆಳೆ ಬಗ್ಗೆ ಯಾವುದೇ ಪ್ರಶ್ನೆ ಕೇಳಿ...",
+    mr: "तुमच्या पिकाबद्दल कोणताही प्रश्न विचारा...",
+    pa: "ਆਪਣੀ ਫਸਲ ਬਾਰੇ ਕੋਈ ਵੀ ਸਵਾਲ ਪੁੱਛੋ...",
+    bn: "ফসল সংক্রান্ত প্রশ্ন জিজ্ঞাসা করুন...",
+    gu: "પાક અંગે કોઈ પ્રશ્ન પૂછો...",
+    ml: "കൃഷി സംബന്ധമായ ചോദ്യങ്ങൾ ചോദിക്കുക...",
+  },
+  send: { en: "Send", te: "పంపండి", hi: "भेजें", ta: "அனுப்பு", kn: "ಕಳುಹಿಸಿ", mr: "पाठवा", pa: "ਭੇਜੋ", bn: "পাঠান", gu: "મોકલો", ml: "അയക്കുക" }
 };
 
 export default function HelpDesk() {
@@ -61,13 +139,13 @@ export default function HelpDesk() {
     return HELPDESK_STRINGS[key]?.[language] || HELPDESK_STRINGS[key]?.en || "";
   };
 
-  // AI Chat state
+  // 1. AI Chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: "msg_welcome",
       sender: "ai",
       text: t("auto_greeting", { name: user?.fullName.split(" ")[0] || "Farmer" }) ||
-        "Hello! I am your AgroScan Farming Assistant. How can I help you today? You can ask about crop care, pest management, or report an issue.",
+        "Hello! I am your AgroScan Farming Assistant. You can ask me any crop care question in whatever language you prefer (Telugu, Hindi, Tamil, Kannada, Marathi, English, etc.).",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     },
   ]);
@@ -75,21 +153,23 @@ export default function HelpDesk() {
   const [sendingAi, setSendingAi] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
 
-  // Problem Ticket form state
-  const [ticketCategory, setTicketCategory] = useState<SupportTicket["category"]>("crop_disease");
-  const [ticketCrop, setTicketCrop] = useState<string>("");
+  // 2. Problem Ticket state (for website / app issues)
+  const [ticketCategory, setTicketCategory] = useState<"app_bug" | "account_issue" | "general_complaint">("app_bug");
   const [ticketTitle, setTicketTitle] = useState("");
   const [ticketDesc, setTicketDesc] = useState("");
   const [submittingTicket, setSubmittingTicket] = useState(false);
   const [ticketSuccess, setTicketSuccess] = useState<SupportTicket | null>(null);
 
-  // Government Agronomist form state
+  // 3. Government Agronomist state (Gram Sachivalayam / RBK)
+  const [govCategory, setGovCategory] = useState<
+    "land_id_registration" | "app_usage_explanation" | "land_record_problem" | "crop_disease"
+  >("land_id_registration");
   const [govCrop, setGovCrop] = useState("");
   const [govProblem, setGovProblem] = useState("");
   const [submittingGov, setSubmittingGov] = useState(false);
   const [govReferralReceipt, setGovReferralReceipt] = useState<any | null>(null);
 
-  // Tickets list
+  // 4. Tickets list
   const [myTickets, setMyTickets] = useState<SupportTicket[]>([]);
   const [loadingTickets, setLoadingTickets] = useState(false);
 
@@ -98,7 +178,6 @@ export default function HelpDesk() {
       if (Array.isArray(res)) {
         setRegisteredCrops(res);
         if (res.length > 0) {
-          setTicketCrop(res[0].cropName);
           setGovCrop(res[0].cropName);
         }
       }
@@ -127,14 +206,15 @@ export default function HelpDesk() {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, sendingAi]);
 
-  // Handle AI Chat Submit
-  const handleSendAiMessage = async (e?: React.FormEvent) => {
+  // ── 1. AI Chat Submit Handler ───────────────────────────────────────────
+  const handleSendAiQuestion = async (e?: FormEvent) => {
     if (e) e.preventDefault();
     if (!inputQuestion.trim() || sendingAi) return;
 
     const userText = inputQuestion.trim();
+    const userMsgId = `user_${Date.now()}`;
     const userMsg: ChatMessage = {
-      id: `user_${Date.now()}`,
+      id: userMsgId,
       sender: "farmer",
       text: userText,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -145,588 +225,545 @@ export default function HelpDesk() {
     setSendingAi(true);
 
     try {
-      const res = await aiAssistantApi.chat({
+      const cropList = registeredCrops.map((c) => c.cropName);
+      const res = await aiAssistantApi.ask({
         message: userText,
         language,
         farmerName: user?.fullName || "Farmer",
-        registeredCrops: registeredCrops.map((c) => c.cropName),
-        location: `${location.villageCity}, ${location.district}`,
+        crops: cropList,
+        location: `${location.villageCity || "Gowdapalem"}, ${location.district || "Guntur"}`,
       });
-
-      const isComplaint =
-        /damaged|ruined|wrong|failed|bug|error|complaint|emergency|help me please|loss|loss of crop/i.test(userText);
 
       const aiMsg: ChatMessage = {
         id: `ai_${Date.now()}`,
         sender: "ai",
-        text: res.reply || "I am here to assist you with any crop or platform queries.",
+        text: res.answer,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        canEscalate: isComplaint,
+        canEscalate: true,
       };
 
       setChatMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: `ai_${Date.now()}`,
-          sender: "ai",
-          text: "I am having trouble answering right now. Please submit a support ticket or contact our extension agronomist below.",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          canEscalate: true,
-        },
-      ]);
+      console.error("AI chat error:", err);
+      const errorMsg: ChatMessage = {
+        id: `ai_err_${Date.now()}`,
+        sender: "ai",
+        text: "I am currently assisting many farmers. For immediate pest management, please check the 'Scan Leaf' tool or request a Government Agronomist visit.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      setChatMessages((prev) => [...prev, errorMsg]);
     } finally {
       setSendingAi(false);
     }
   };
 
-  // Handle Ticket Form Submit
-  const handleCreateTicket = async (e: React.FormEvent) => {
+  // ── 2. Submit Problem Report (For App & Website Bugs) ───────────────────
+  const handleSubmitTicket = async (e: FormEvent) => {
     e.preventDefault();
     if (!ticketDesc.trim()) return;
 
     setSubmittingTicket(true);
     try {
       const res = await supportApi.createTicket({
-        title: ticketTitle.trim() || (ticketCrop ? `Issue in ${ticketCrop}` : "Farmer Problem Report"),
+        title: ticketTitle.trim() || "Website / App Problem Report",
         description: ticketDesc.trim(),
-        cropName: ticketCrop || undefined,
-        category: ticketCategory,
-        location: `${location.villageCity}, ${location.district}`,
+        category: ticketCategory as any,
+        location: `${location.villageCity || "Gowdapalem"}, ${location.district || "Guntur"}`,
       });
 
       setTicketSuccess(res.ticket);
       setTicketTitle("");
       setTicketDesc("");
-      loadMyTickets();
     } catch (err) {
-      console.error("Ticket submission error:", err);
+      console.error("Failed to submit ticket:", err);
     } finally {
       setSubmittingTicket(false);
     }
   };
 
-  // Handle Government Agronomist Referral Submit
-  const handleGovReferral = async (e: React.FormEvent) => {
+  // ── 3. Submit Government Agronomist Referral (RBK) ──────────────────────
+  const handleSubmitGovReferral = async (e: FormEvent) => {
     e.preventDefault();
     if (!govProblem.trim()) return;
 
     setSubmittingGov(true);
     try {
-      const res = await supportApi.createAgronomistReferral({
-        cropName: govCrop || undefined,
-        problemDescription: govProblem.trim(),
-        villageCity: location.villageCity,
-        district: location.district,
-        state: location.state || "Andhra Pradesh",
+      const categoryTitles: Record<string, string> = {
+        land_id_registration: "Land & Farmer ID Registration Request (Passbook / Aadhaar / PM-KISAN)",
+        app_usage_explanation: "Website / App Usage Walkthrough Request",
+        land_record_problem: "Land Registration Issue (1B Record / Survey Mismatch)",
+        crop_disease: "Field Crop Disease / Soil Health Escalation",
+      };
+
+      const res = await supportApi.referToGovt({
+        cropName: govCrop || "Field Crop",
+        issueDescription: govProblem.trim(),
+        farmerNotes: categoryTitles[govCategory] || "Government Extension Request",
+        location: `${location.villageCity || "Gowdapalem"}, ${location.district || "Guntur"}`,
       });
 
-      setGovReferralReceipt(res.referralDetails);
+      setGovReferralReceipt({
+        ...res,
+        category: categoryTitles[govCategory],
+        cropName: govCrop,
+        description: govProblem,
+        date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+      });
       setGovProblem("");
-      loadMyTickets();
     } catch (err) {
-      console.error("Government referral error:", err);
+      console.error("Govt referral error:", err);
     } finally {
       setSubmittingGov(false);
     }
   };
 
   return (
-    <main className="workspace-page min-h-screen bg-[#f7f8f4] text-[#1c3827] pb-16">
+    <main className="workspace-page min-h-screen bg-[#f7f8f4] text-[#1c3827]">
       {/* Top Header */}
-      <header className="workspace-topbar sticky top-0 z-40 bg-[#f7f8f4]/95 backdrop-blur border-b border-[#e1e6d7] px-6 py-4 flex items-center justify-between">
+      <header className="workspace-topbar sticky top-0 z-40 bg-[#f7f8f4]/90 backdrop-blur border-b border-[#e1e6d7] px-6 py-4 flex items-center justify-between">
         <Link href="/dashboard" className="workspace-back inline-flex items-center gap-2 text-sm font-bold text-[#2f6b45] no-underline hover:underline">
           <ArrowLeft size={17} /> <span>{t("back_to_dashboard")}</span>
         </Link>
         <div className="flex items-center gap-2 font-display text-lg font-bold text-[#20402e]">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#2f6b45] text-white">
+          <EditableFrame id="helpdesk_header_icon" className="h-8 w-8 rounded-xl bg-[#2f6b45] text-white">
             <HelpCircle size={18} />
-          </span>
-          <span>{t("help_desk")}</span>
+          </EditableFrame>
+          <span>{str("title")}</span>
         </div>
         <span className="hidden sm:inline-block text-xs font-extrabold uppercase tracking-wider text-[#456b52] bg-[#e5eddc] px-3 py-1 rounded-full">
-          AI &amp; Govt Extension Support
+          24/7 Farmer Help Desk
         </span>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        {/* Title */}
-        <div className="mb-6 text-center sm:text-left">
-          <p className="text-xs font-extrabold uppercase tracking-widest text-[#2f6b45]">
-            {str("eyebrow")}
-          </p>
-          <h1 className="mt-1 font-display text-3xl sm:text-4xl font-extrabold text-[#193625]">
-            {str("title")}
-          </h1>
-          <p className="mt-2 text-sm text-[#4d6957]">
-            {location.villageCity}, {location.district}
-          </p>
-        </div>
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+        {/* Page Title */}
+        <EditableFrame id="helpdesk_heading_panel" isTextOnly>
+          <div className="space-y-1">
+            <p className="text-xs font-extrabold uppercase tracking-widest text-[#2f6b45]">
+              {str("eyebrow")}
+            </p>
+            <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#193625]">
+              {str("title")}
+            </h1>
+            <p className="text-sm text-[#4d6957]">
+              Get instant multilingual AI crop advice, report website issues to Admin, or request official Gram Sachivalayam agronomist assistance.
+            </p>
+          </div>
+        </EditableFrame>
 
-        {/* 4 Navigation Tabs */}
-        <div className="mb-6 flex flex-wrap gap-2 border-b border-[#d8e2cf] pb-3">
+        {/* 4 Feature Tabs */}
+        <div className="flex flex-wrap gap-2.5">
           <button
             type="button"
             onClick={() => setActiveTab("ai_chat")}
-            className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "ai_chat"
-                ? "bg-[#2f6b45] text-white shadow-md"
+                ? "bg-[#2f6b45] text-white shadow-lg scale-105"
                 : "bg-white text-[#294c36] border border-[#d8e2cf] hover:bg-[#eaf0e3]"
             }`}
           >
-            <Bot size={15} /> {str("tab_ai")}
+            <Bot size={15} />
+            <span>{str("tab_ai")}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              setActiveTab("report_problem");
-              setTicketSuccess(null);
-            }}
-            className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            onClick={() => setActiveTab("report_problem")}
+            className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "report_problem"
-                ? "bg-rose-700 text-white shadow-md"
+                ? "bg-[#2f6b45] text-white shadow-lg scale-105"
                 : "bg-white text-[#294c36] border border-[#d8e2cf] hover:bg-[#eaf0e3]"
             }`}
           >
-            <AlertTriangle size={15} /> {str("tab_report")}
+            <AlertTriangle size={15} />
+            <span>{str("tab_report")}</span>
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              setActiveTab("gov_agronomist");
-              setGovReferralReceipt(null);
-            }}
-            className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            onClick={() => setActiveTab("gov_agronomist")}
+            className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "gov_agronomist"
-                ? "bg-amber-600 text-white shadow-md"
+                ? "bg-[#2f6b45] text-white shadow-lg scale-105"
                 : "bg-white text-[#294c36] border border-[#d8e2cf] hover:bg-[#eaf0e3]"
             }`}
           >
-            <Building2 size={15} /> {str("tab_gov")}
+            <Building2 size={15} />
+            <span>{str("tab_gov")}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("my_tickets")}
-            className={`flex items-center gap-2 rounded-2xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-xs font-bold transition-all cursor-pointer ${
               activeTab === "my_tickets"
-                ? "bg-[#20402e] text-white shadow-md"
+                ? "bg-[#2f6b45] text-white shadow-lg scale-105"
                 : "bg-white text-[#294c36] border border-[#d8e2cf] hover:bg-[#eaf0e3]"
             }`}
           >
-            <FileText size={15} /> {str("tab_tickets")}
-            {myTickets.length > 0 && (
-              <span className="rounded-full bg-emerald-200 text-emerald-900 px-2 py-0.5 text-[10px] font-extrabold">
-                {myTickets.length}
-              </span>
-            )}
+            <FileText size={15} />
+            <span>{str("tab_tickets")}</span>
           </button>
         </div>
 
-        {/* ── TAB 1: AI Instant Advisory Chat ────────────────────────────── */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* TAB 1: AI ADVISOR CHAT (MULTILINGUAL WITH AUTO-DETECTION) */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "ai_chat" && (
-          <div className="rounded-3xl border border-[#d8e0cc] bg-white shadow-xl overflow-hidden flex flex-col h-[560px]">
-            <div className="bg-[#2f6b45] p-4 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
-                  <Bot size={20} className="text-emerald-200" />
+          <EditableFrame
+            id="helpdesk_chat_card"
+            className="rounded-3xl border border-[#d8e0cc] bg-white p-6 shadow-xl space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-[#e5edd8] pb-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#e5eddc] text-[#2f6b45]">
+                  <Sparkles size={20} />
                 </span>
                 <div>
-                  <h3 className="font-display font-bold text-sm">AgroScan AI Agronomist Desk</h3>
-                  <p className="text-[11px] text-emerald-100">{location.villageCity}, {location.district}</p>
+                  <h3 className="font-display text-lg font-bold text-[#183624]">Leaf AI Multilingual Agronomy Chat</h3>
+                  <p className="text-xs text-[#52705d]">Auto-detects your query language (Telugu, Hindi, Tamil, Kannada, Marathi, English)</p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab("report_problem");
-                  setTicketTitle(chatMessages[chatMessages.length - 1]?.text || "");
-                }}
-                className="text-[11px] font-bold bg-white/15 hover:bg-white/25 px-3 py-1.5 rounded-xl border border-white/20 text-white flex items-center gap-1 cursor-pointer"
-              >
-                <AlertTriangle size={12} className="text-amber-300" /> {str("escalate_btn")}
-              </button>
             </div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-[#fbfcf9]">
+            {/* Chat Messages Log */}
+            <div className="min-h-[350px] max-h-[480px] overflow-y-auto space-y-4 p-4 rounded-2xl bg-[#f9faf6] border border-[#e2ebd9]">
               {chatMessages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex flex-col ${msg.sender === "farmer" ? "items-end" : "items-start"}`}
                 >
                   <div
-                    className={`max-w-xl rounded-2xl p-4 text-xs leading-relaxed shadow-sm ${
+                    className={`max-w-xl rounded-2xl p-4 text-xs font-medium leading-relaxed shadow-sm ${
                       msg.sender === "farmer"
                         ? "bg-[#2f6b45] text-white rounded-br-none"
-                        : "bg-white border border-[#d8e0cc] text-[#193625] rounded-bl-none"
+                        : "bg-white text-[#193625] border border-[#d8e0cc] rounded-bl-none"
                     }`}
                   >
                     <p className="whitespace-pre-line">{msg.text}</p>
-                    <span className={`block text-[10px] mt-1.5 ${msg.sender === "farmer" ? "text-emerald-100 text-right" : "text-[#718b7c]"}`}>
-                      {msg.timestamp}
-                    </span>
                   </div>
-
-                  {msg.canEscalate && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab("report_problem");
-                        setTicketTitle(msg.text.slice(0, 50));
-                      }}
-                      className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-xl hover:bg-rose-100 cursor-pointer"
-                    >
-                      <AlertTriangle size={12} /> {str("escalate_btn")}
-                    </button>
-                  )}
+                  <span className="text-[10px] text-gray-400 mt-1 px-1">{msg.timestamp}</span>
                 </div>
               ))}
 
               {sendingAi && (
-                <div className="flex items-center gap-2 text-xs text-[#2f6b45] font-bold bg-white p-3 rounded-2xl border border-[#d8e0cc] w-fit shadow-sm">
-                  <LoaderCircle size={15} className="animate-spin" />
-                  <span>AgroScan AI is analyzing your crop query...</span>
+                <div className="flex items-center gap-2 text-xs text-[#52705d] font-bold p-2">
+                  <LoaderCircle size={16} className="animate-spin text-[#2f6b45]" />
+                  <span>Leaf AI is analyzing your agronomic question…</span>
                 </div>
               )}
               <div ref={chatBottomRef} />
             </div>
 
-            {/* Chat Input */}
-            <form onSubmit={handleSendAiMessage} className="p-3 bg-white border-t border-[#e2ebd9] flex gap-2">
+            {/* Chat Input Box */}
+            <form onSubmit={handleSendAiQuestion} className="flex gap-2">
               <input
                 type="text"
                 value={inputQuestion}
                 onChange={(e) => setInputQuestion(e.target.value)}
                 placeholder={str("ask_placeholder")}
-                className="flex-1 rounded-2xl border border-[#ccd8bf] bg-[#f8faf5] px-4 py-3 text-xs text-[#193825] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 font-medium"
+                disabled={sendingAi}
+                className="flex-1 rounded-2xl border border-[#cbd8bf] bg-white px-4 py-3.5 text-xs font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 shadow-sm"
               />
               <button
                 type="submit"
                 disabled={sendingAi || !inputQuestion.trim()}
-                className="rounded-2xl bg-[#2f6b45] text-white px-5 py-3 text-xs font-bold shadow-md hover:bg-[#20492f] disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                className="rounded-2xl bg-[#2f6b45] px-6 py-3.5 text-xs font-bold text-white hover:bg-[#20492f] disabled:opacity-50 flex items-center gap-2 shadow-sm cursor-pointer transition-all"
               >
-                <Send size={14} /> {str("send")}
+                <Send size={15} /> <span>{str("send")}</span>
               </button>
             </form>
-          </div>
+          </EditableFrame>
         )}
 
-        {/* ── TAB 2: Report Problem Ticket to Admin ───────────────────────── */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* TAB 2: REPORT A PROBLEM (WEBSITE / APP BUG REPORTING TO ADMIN) */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "report_problem" && (
-          <div className="rounded-3xl border border-[#d8e0cc] bg-white p-6 sm:p-8 shadow-xl">
+          <EditableFrame
+            id="helpdesk_report_problem_card"
+            className="rounded-3xl border border-[#d8e0cc] bg-white p-6 sm:p-8 shadow-xl space-y-6"
+          >
+            <div className="border-b border-[#e5edd8] pb-4 space-y-1">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={20} className="text-amber-600" />
+                <h3 className="font-display text-2xl font-bold text-[#183624]">Report a Website or App Problem</h3>
+              </div>
+              <p className="text-xs text-[#52705d]">
+                Notice a bug, scanner failure, login error, or broken feature? Submit details here. Your report goes directly to the AgroScan Admin Ticket Notice Board for review and resolution.
+              </p>
+            </div>
+
             {ticketSuccess ? (
-              <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-6 space-y-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 size={24} className="text-emerald-700" />
-                  <h3 className="font-display text-xl font-bold text-emerald-950">Problem Ticket Created Successfully</h3>
-                </div>
-                <p className="text-xs text-emerald-900 leading-relaxed">
-                  Your ticket <strong>#{ticketSuccess.id}</strong> has been assigned to the AgroScan Admin team. You will see admin responses in your "My Support Tickets" tab.
+              <div className="rounded-2xl bg-emerald-50 border border-emerald-300 p-6 text-center space-y-3 animate-in zoom-in-95">
+                <CheckCircle2 size={36} className="text-emerald-700 mx-auto" />
+                <h4 className="font-display text-lg font-bold text-emerald-950">
+                  Problem Report Submitted Successfully!
+                </h4>
+                <p className="text-xs text-emerald-900">
+                  Ticket Reference Number: <strong>{ticketSuccess.ticketNumber}</strong>. Our engineering and admin team has been notified.
                 </p>
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("my_tickets")}
-                    className="rounded-xl bg-[#2f6b45] px-4 py-2 text-xs font-bold text-white hover:bg-[#20492f] cursor-pointer"
-                  >
-                    View My Tickets
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTicketSuccess(null)}
-                    className="rounded-xl border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-900 hover:bg-emerald-100 cursor-pointer"
-                  >
-                    Submit Another Ticket
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setTicketSuccess(null)}
+                  className="rounded-xl bg-[#2f6b45] px-5 py-2 text-xs font-bold text-white hover:bg-[#20492f] cursor-pointer"
+                >
+                  Report Another Issue
+                </button>
               </div>
             ) : (
-              <form onSubmit={handleCreateTicket} className="space-y-4">
-                <h3 className="font-display text-xl font-bold text-[#183624] flex items-center gap-2">
-                  <AlertTriangle size={20} className="text-rose-600" /> Report Crop or App Issue to Admin
-                </h3>
-                <p className="text-xs text-[#52705d]">
-                  Our agricultural specialist will review your crop conditions, diagnostic photos, or system feedback.
-                </p>
-
+              <form onSubmit={handleSubmitTicket} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-[#193625] mb-1">Issue Category</label>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-[#183624]">Issue Category *</label>
                     <select
                       value={ticketCategory}
                       onChange={(e) => setTicketCategory(e.target.value as any)}
-                      className="w-full rounded-xl border border-[#cbd9c3] bg-[#f8faf5] px-3 py-2 text-xs font-semibold text-[#1a3826]"
+                      className="w-full rounded-xl border border-[#cbd8bf] bg-white px-3.5 py-2.5 text-xs font-bold text-[#183624] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 cursor-pointer"
                     >
-                      <option value="crop_disease">Crop Disease &amp; Pest Escalation</option>
-                      <option value="app_bug">App Bug / Feature Issue</option>
-                      <option value="fertilizer_advice">Fertilizer &amp; Spray Query</option>
-                      <option value="account">Account &amp; Location Setting</option>
-                      <option value="other">Other Inquiries</option>
+                      <option value="app_bug">App Bug / Feature Not Working</option>
+                      <option value="account_issue">Account &amp; Mobile OTP Login Issue</option>
+                      <option value="general_complaint">General Website Feedback</option>
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[#193625] mb-1">Affected Crop (Optional)</label>
-                    <select
-                      value={ticketCrop}
-                      onChange={(e) => setTicketCrop(e.target.value)}
-                      className="w-full rounded-xl border border-[#cbd9c3] bg-[#f8faf5] px-3 py-2 text-xs font-semibold text-[#1a3826]"
-                    >
-                      <option value="">Select Crop (Optional)</option>
-                      {registeredCrops.map((c) => (
-                        <option key={c.id} value={c.cropName}>
-                          {localizeCrop(c.cropName, language)} ({c.fieldName})
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-[#183624]">Brief Problem Title</label>
+                    <input
+                      type="text"
+                      value={ticketTitle}
+                      onChange={(e) => setTicketTitle(e.target.value)}
+                      placeholder="e.g. Camera scan freezes on Chrome"
+                      className="w-full rounded-xl border border-[#cbd8bf] bg-white px-3.5 py-2.5 text-xs font-bold text-[#183624] focus:outline-none"
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#193625] mb-1">Problem Subject / Title</label>
-                  <input
-                    type="text"
-                    value={ticketTitle}
-                    onChange={(e) => setTicketTitle(e.target.value)}
-                    placeholder="e.g. Yellowing leaf tips spreading rapidly after heavy rain"
-                    className="w-full rounded-xl border border-[#cbd9c3] bg-[#f8faf5] px-3 py-2 text-xs text-[#1a3826]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#193625] mb-1">Detailed Description *</label>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-[#183624]">Problem Description &amp; Steps to Reproduce *</label>
                   <textarea
                     rows={4}
                     value={ticketDesc}
                     onChange={(e) => setTicketDesc(e.target.value)}
-                    placeholder="Describe symptoms, chemical sprays already applied, and current field conditions..."
+                    placeholder="Describe what happened, which button you clicked, and what went wrong..."
                     required
-                    className="w-full rounded-xl border border-[#cbd9c3] bg-[#f8faf5] px-3 py-2 text-xs text-[#1a3826] focus:ring-2 focus:ring-[#2f6b45]"
+                    className="w-full rounded-xl border border-[#cbd8bf] bg-white p-3.5 text-xs font-medium text-[#183624] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submittingTicket || !ticketDesc.trim()}
-                  className="w-full sm:w-auto rounded-2xl bg-rose-700 hover:bg-rose-800 text-white px-6 py-3 text-xs font-bold shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="rounded-2xl bg-[#2f6b45] px-7 py-3 text-xs font-bold text-white shadow-lg hover:bg-[#20492f] disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-all"
                 >
-                  {submittingTicket ? <LoaderCircle size={15} className="animate-spin" /> : <AlertTriangle size={15} />}
-                  <span>{str("submit_ticket")}</span>
+                  {submittingTicket ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={15} />}
+                  <span>Submit Problem Report to Admin</span>
                 </button>
               </form>
             )}
-          </div>
+          </EditableFrame>
         )}
 
-        {/* ── TAB 3: Government Agronomist Referral (Gram Sachivalayam) ────── */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* TAB 3: GOVERNMENT AGRONOMIST (GRAM SACHIVALAYAM / RBK DESK) */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "gov_agronomist" && (
-          <div className="rounded-3xl border border-[#d8e0cc] bg-white p-6 sm:p-8 shadow-xl space-y-6">
-            <div>
-              <span className="text-xs font-extrabold uppercase tracking-wider text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
-                Government Department of Agriculture
-              </span>
-              <h3 className="font-display text-2xl font-bold text-[#183624] mt-2 flex items-center gap-2">
-                <Building2 size={24} className="text-amber-600" /> Gram Sachivalayam &amp; Extension Agronomist Connect
-              </h3>
-              <p className="text-xs text-[#52705d] mt-1">
-                Official village-level agricultural officer linkage for {location.villageCity}, {location.district} ({location.state}).
+          <EditableFrame
+            id="helpdesk_gov_agronomist_card"
+            className="rounded-3xl border border-[#d8e0cc] bg-white p-6 sm:p-8 shadow-xl space-y-6"
+          >
+            <div className="border-b border-[#e5edd8] pb-4 space-y-1">
+              <div className="flex items-center gap-2">
+                <Building2 size={22} className="text-[#2f6b45]" />
+                <h3 className="font-display text-2xl font-bold text-[#183624]">
+                  Government Agronomist &amp; Gram Sachivalayam Desk
+                </h3>
+              </div>
+              <p className="text-xs text-[#52705d]">
+                Request an official Rythu Bharosa Kendra (RBK) agricultural extension officer visit, solve Pattadar/Farmer ID issues, or receive on-field assistance.
               </p>
             </div>
 
             {govReferralReceipt ? (
-              <div className="rounded-3xl border-2 border-amber-400 bg-amber-50/70 p-6 shadow-md space-y-4">
-                <div className="flex items-center justify-between border-b border-amber-200 pb-3">
+              <div className="rounded-3xl bg-[#f6faf2] border-2 border-emerald-300 p-6 sm:p-8 space-y-4 animate-in zoom-in-95">
+                <div className="flex items-center justify-between border-b border-emerald-200 pb-3">
                   <div>
-                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-900">
-                      Official Referral Generated
+                    <span className="text-[10px] font-extrabold uppercase text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+                      Official Government Referral Tracking
                     </span>
-                    <h4 className="font-display text-2xl font-extrabold text-[#173624] mt-1.5">
-                      Ref #{govReferralReceipt.referenceNumber}
+                    <h4 className="font-display text-xl font-bold text-[#183624] mt-1">
+                      Referral Code: {govReferralReceipt.referralNumber}
                     </h4>
                   </div>
-                  <span className="h-10 w-10 flex items-center justify-center rounded-2xl bg-amber-500 text-gray-950">
-                    <CheckCircle2 size={24} />
-                  </span>
+                  <span className="text-xs font-bold text-emerald-800">{govReferralReceipt.date}</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[#1c3827]">
-                  <div className="p-3 bg-white rounded-2xl border border-amber-200">
-                    <strong className="block text-amber-950">Government Office:</strong>
-                    <span>{govReferralReceipt.department}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-white rounded-xl border border-emerald-200">
+                    <strong className="block text-[#193625]">Selected Topic:</strong>
+                    <span className="text-[#3a5845]">{govReferralReceipt.category}</span>
                   </div>
-                  <div className="p-3 bg-white rounded-2xl border border-amber-200">
-                    <strong className="block text-amber-950">Assigned Officer Role:</strong>
-                    <span>{govReferralReceipt.assignedOfficerRole}</span>
-                  </div>
-                  <div className="p-3 bg-white rounded-2xl border border-amber-200">
-                    <strong className="block text-amber-950">Kisan Toll-Free Helpline:</strong>
-                    <a href="tel:155251" className="text-[#2f6b45] font-bold hover:underline">
-                      {govReferralReceipt.kisanTollFree}
-                    </a>
-                  </div>
-                  <div className="p-3 bg-white rounded-2xl border border-amber-200">
-                    <strong className="block text-amber-950">Official Portal:</strong>
-                    <a
-                      href={govReferralReceipt.portalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[#2f6b45] font-bold hover:underline flex items-center gap-1"
-                    >
-                      {govReferralReceipt.portalUrl} <ExternalLink size={12} />
-                    </a>
+                  <div className="p-3 bg-white rounded-xl border border-emerald-200">
+                    <strong className="block text-[#193625]">Farmer Location:</strong>
+                    <span className="text-[#3a5845]">{location.villageCity || "Gowdapalem"}, {location.district || "Guntur"}</span>
                   </div>
                 </div>
 
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("my_tickets")}
-                    className="rounded-xl bg-[#2f6b45] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#20492f] cursor-pointer"
-                  >
-                    View in Ticket History
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGovReferralReceipt(null)}
-                    className="rounded-xl border border-[#ccd8bf] bg-white px-5 py-2.5 text-xs font-bold text-[#244832] hover:bg-[#edf5e6] cursor-pointer"
-                  >
-                    Submit Another Referral
-                  </button>
-                </div>
+                <p className="text-xs text-emerald-950">
+                  Your request has been routed to the Gram Sachivalayam Agricultural Assistant for your mandal. A representative will contact you at <strong>{user?.phoneNumber}</strong>.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setGovReferralReceipt(null)}
+                  className="rounded-xl bg-[#2f6b45] px-5 py-2 text-xs font-bold text-white hover:bg-[#20492f] cursor-pointer"
+                >
+                  Create Another Request
+                </button>
               </div>
             ) : (
-              <form onSubmit={handleGovReferral} className="space-y-4">
-                <div className="rounded-2xl bg-amber-50 p-4 border border-amber-200 text-xs text-amber-950">
-                  <p className="font-bold flex items-center gap-1.5 mb-1">
-                    <Building2 size={15} className="text-amber-700" />
-                    Connecting to Gram Sachivalayam Rythu Bharosa Kendra ({location.villageCity}, {location.district})
-                  </p>
-                  <p className="text-[11px] text-amber-900 leading-relaxed">
-                    This channel generates an official agricultural extension referral for field inspection, soil health verification, or subsidized inputs from local government officers.
-                  </p>
+              <form onSubmit={handleSubmitGovReferral} className="space-y-5">
+                {/* Specific Selectable Topic Categories */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-[#183624]">Select Assistance Topic Category *</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setGovCategory("land_id_registration")}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        govCategory === "land_id_registration"
+                          ? "border-[#2f6b45] bg-[#edf4e8] shadow-sm font-bold"
+                          : "border-[#d8e2cf] bg-[#fafcf7] text-[#34543e] hover:bg-[#f2f7ec]"
+                      }`}
+                    >
+                      <h5 className="text-xs font-bold text-[#183624]">1. Land &amp; Farmer ID Registration</h5>
+                      <p className="text-[11px] text-[#52705d] mt-1 font-normal">Pattadar Passbook, Aadhaar seeding, PM-KISAN, Rythu Bharosa linking</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGovCategory("app_usage_explanation")}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        govCategory === "app_usage_explanation"
+                          ? "border-[#2f6b45] bg-[#edf4e8] shadow-sm font-bold"
+                          : "border-[#d8e2cf] bg-[#fafcf7] text-[#34543e] hover:bg-[#f2f7ec]"
+                      }`}
+                    >
+                      <h5 className="text-xs font-bold text-[#183624]">2. App Usage Explanation Request</h5>
+                      <p className="text-[11px] text-[#52705d] mt-1 font-normal">Ask a local RBK officer to explain &amp; walk through using AgroScan</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGovCategory("land_record_problem")}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        govCategory === "land_record_problem"
+                          ? "border-[#2f6b45] bg-[#edf4e8] shadow-sm font-bold"
+                          : "border-[#d8e2cf] bg-[#fafcf7] text-[#34543e] hover:bg-[#f2f7ec]"
+                      }`}
+                    >
+                      <h5 className="text-xs font-bold text-[#183624]">3. Land Registration Problems</h5>
+                      <p className="text-[11px] text-[#52705d] mt-1 font-normal">1B record mismatch, survey number boundary disputes, tenancy records</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setGovCategory("crop_disease")}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        govCategory === "crop_disease"
+                          ? "border-[#2f6b45] bg-[#edf4e8] shadow-sm font-bold"
+                          : "border-[#d8e2cf] bg-[#fafcf7] text-[#34543e] hover:bg-[#f2f7ec]"
+                      }`}
+                    >
+                      <h5 className="text-xs font-bold text-[#183624]">4. Field Crop Disease Escalation</h5>
+                      <p className="text-[11px] text-[#52705d] mt-1 font-normal">In-person field inspection for severe pest outbreak or soil health</p>
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#193625] mb-1">Crop / Farm Concern</label>
-                  <select
-                    value={govCrop}
-                    onChange={(e) => setGovCrop(e.target.value)}
-                    className="w-full rounded-xl border border-[#cbd9c3] bg-[#f8faf5] px-3 py-2 text-xs font-semibold text-[#1a3826]"
-                  >
-                    {registeredCrops.map((c) => (
-                      <option key={c.id} value={c.cropName}>
-                        {localizeCrop(c.cropName, language)} ({c.fieldName})
-                      </option>
-                    ))}
-                    <option value="Rice (Paddy)">Rice (Paddy)</option>
-                    <option value="Tomato">Tomato</option>
-                    <option value="Maize">Maize</option>
-                    <option value="Cotton">Cotton</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#193625] mb-1">Problem / Scheme Request</label>
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-[#183624]">Describe Your Specific Request or Field Issue *</label>
                   <textarea
                     rows={4}
                     value={govProblem}
                     onChange={(e) => setGovProblem(e.target.value)}
-                    placeholder="Specify the problem for the Village Agriculture Assistant (VAA) or scheme details requested..."
+                    placeholder="Provide your survey number, Aadhaar reference, or field location details..."
                     required
-                    className="w-full rounded-xl border border-[#cbd9c3] bg-[#f8faf5] px-3 py-2 text-xs text-[#1a3826] focus:ring-2 focus:ring-amber-500"
+                    className="w-full rounded-xl border border-[#cbd8bf] bg-white p-3.5 text-xs font-medium text-[#183624] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submittingGov || !govProblem.trim()}
-                  className="w-full sm:w-auto rounded-2xl bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 text-xs font-bold shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="rounded-2xl bg-[#2f6b45] px-7 py-3.5 text-xs font-bold text-white shadow-lg hover:bg-[#20492f] disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-all"
                 >
-                  {submittingGov ? <LoaderCircle size={15} className="animate-spin" /> : <Building2 size={15} />}
-                  <span>Generate Government Referral</span>
+                  {submittingGov ? <LoaderCircle size={16} className="animate-spin" /> : <Building2 size={16} />}
+                  <span>Submit Request to Gram Sachivalayam RBK</span>
                 </button>
               </form>
             )}
-          </div>
+          </EditableFrame>
         )}
 
-        {/* ── TAB 4: My Support Tickets History ──────────────────────────── */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* TAB 4: MY SUPPORT TICKETS */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         {activeTab === "my_tickets" && (
-          <div className="rounded-3xl border border-[#d8e0cc] bg-white p-6 sm:p-8 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#e5edd8] pb-3">
+          <EditableFrame
+            id="helpdesk_my_tickets_card"
+            className="rounded-3xl border border-[#d8e0cc] bg-white p-6 sm:p-8 shadow-xl space-y-6"
+          >
+            <div className="flex items-center justify-between border-b border-[#e5edd8] pb-4">
               <div>
-                <h3 className="font-display text-xl font-bold text-[#183624]">My Support Tickets &amp; Referrals</h3>
-                <p className="text-xs text-[#52705d]">Track status and responses from Admin and Govt extension officers</p>
+                <h3 className="font-display text-xl font-bold text-[#183624]">My Open &amp; Resolved Tickets</h3>
+                <p className="text-xs text-[#52705d]">Track responses from AgroScan Admin and Gram Sachivalayam agronomists</p>
               </div>
               <button
                 type="button"
                 onClick={loadMyTickets}
-                className="flex items-center gap-1 rounded-xl bg-gray-100 hover:bg-gray-200 px-3 py-1.5 text-xs font-bold text-gray-700 cursor-pointer"
+                disabled={loadingTickets}
+                className="p-2 text-[#2f6b45] hover:bg-[#eef5e7] rounded-full cursor-pointer"
               >
-                <RefreshCw size={13} className={loadingTickets ? "animate-spin" : ""} /> Refresh
+                <RefreshCw size={16} className={loadingTickets ? "animate-spin" : ""} />
               </button>
             </div>
 
             {loadingTickets ? (
-              <div className="py-12 flex justify-center items-center gap-2 text-xs font-bold text-[#2f6b45]">
-                <LoaderCircle size={20} className="animate-spin" /> Loading your ticket records...
+              <div className="p-8 text-center space-y-2">
+                <LoaderCircle size={28} className="animate-spin text-[#2f6b45] mx-auto" />
+                <p className="text-xs font-bold text-[#52705d]">Loading your tickets…</p>
               </div>
             ) : myTickets.length === 0 ? (
-              <div className="py-12 text-center text-xs text-[#52705d]">
-                <FileText size={32} className="mx-auto mb-2 text-[#9bb09e]" />
-                <p className="font-bold text-[#183624]">No support tickets logged yet.</p>
-                <p className="mt-1">You can ask questions to AI or report problems anytime above.</p>
+              <div className="p-8 text-center space-y-2 bg-[#f9faf6] rounded-2xl border border-[#e5edd8]">
+                <FileText size={32} className="text-[#557662] mx-auto" />
+                <h4 className="font-display text-sm font-bold text-[#183624]">No support tickets created yet</h4>
+                <p className="text-xs text-[#52705d]">You can report problems or request agronomist visits above.</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {myTickets.map((ticket) => (
-                  <div
-                    key={ticket.id}
-                    className="rounded-2xl border border-[#d8e2cf] bg-[#fafcf7] p-4 space-y-2 hover:border-[#2f6b45]/40 transition-colors"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
-                          ticket.status === "Resolved"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : ticket.status === "In Progress"
-                            ? "bg-sky-100 text-sky-800"
-                            : "bg-amber-100 text-amber-800"
-                        }`}>
-                          {localizeStatus(ticket.status, language)}
-                        </span>
-                        <span className="rounded-md bg-[#e5eddc] px-2 py-0.5 text-[10px] font-bold text-[#2f6b45]">
-                          {localizeCategory(ticket.category, language)}
-                        </span>
-                        {ticket.cropName && (
-                          <span className="text-xs font-bold text-[#1c3827]">
-                            Crop: {localizeCrop(ticket.cropName, language)}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[11px] text-[#607d6b] flex items-center gap-1">
-                        <Clock size={12} /> {new Date(ticket.createdAt).toLocaleDateString()}
+                {myTickets.map((tkt) => (
+                  <div key={tkt.id} className="p-4 rounded-2xl border border-[#d8e0cc] bg-[#fafcf7] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-[#2f6b45]">{tkt.ticketNumber}</span>
+                      <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full ${
+                        tkt.status === "Resolved" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                      }`}>
+                        {tkt.status}
                       </span>
                     </div>
-
-                    <h4 className="font-display text-sm font-bold text-[#193825]">{ticket.title}</h4>
-                    <p className="text-xs text-[#415e4c] leading-relaxed">{ticket.description}</p>
-
-                    {ticket.resolutionNotes && (
-                      <div className="mt-2 rounded-xl bg-emerald-50/80 p-3 border border-emerald-200 text-xs text-emerald-950 space-y-1">
-                        <strong className="block text-emerald-900 font-bold">Admin Response / Agronomist Advice:</strong>
-                        <p>{ticket.resolutionNotes}</p>
+                    <h4 className="font-display text-sm font-bold text-[#183624]">{tkt.title}</h4>
+                    <p className="text-xs text-[#4d6b58] leading-relaxed">{tkt.description}</p>
+                    {tkt.resolutionNotes && (
+                      <div className="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
+                        <strong>Admin Response:</strong> {tkt.resolutionNotes}
                       </div>
                     )}
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </EditableFrame>
         )}
       </div>
     </main>

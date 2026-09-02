@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { query } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
+import { sendSMS } from "../services/smsService.js";
 
 const router = Router();
 
@@ -501,6 +502,7 @@ router.post("/register", requireAuth, async (req, res) => {
       state,
       district,
       landArea,
+      landUnit,
       startDate,
       cropName,
       variety,
@@ -512,6 +514,7 @@ router.post("/register", requireAuth, async (req, res) => {
       state?: string;
       district?: string;
       landArea?: string | number;
+      landUnit?: string;
       startDate?: string;
       cropName?: string;
       variety?: string;
@@ -525,6 +528,7 @@ router.post("/register", requireAuth, async (req, res) => {
       state,
       district,
       landArea,
+      landUnit,
       startDate,
       cropName,
       variety,
@@ -541,7 +545,8 @@ router.post("/register", requireAuth, async (req, res) => {
     const resolvedState = state?.trim() || "Andhra Pradesh";
     const resolvedDistrict = district?.trim() || "Guntur";
     const resolvedStartDate = startDate?.trim() || new Date().toISOString().split("T")[0];
-    const area = Number(landArea) || 1.0;
+    const rawArea = Number(landArea) || 1.0;
+    const { acres: area, unit: chosenUnit } = normalizeLandArea(rawArea, landUnit);
 
     const cropKey = cropName.toLowerCase().trim();
     const matchedTemplate =
@@ -599,53 +604,75 @@ router.post("/register", requireAuth, async (req, res) => {
 
         let cropId: string;
         if (cropResult.rows.length === 0) {
-          const inserted = await dbClient.query<{ id: string }>(
-            `INSERT INTO crops (name, category, season)
-             VALUES ($1, 'Other', $2)
+          const insertedCrop = await dbClient.query<{ id: string }>(
+            `INSERT INTO crops (name, scientific_name, category, default_duration_days)
+             VALUES ($1, $2, 'Cereals', 120)
              RETURNING id`,
-            [cropName.trim(), season || null],
+            [cropName.trim(), `${cropName.trim()} sp.`],
           );
-          cropId = inserted.rows[0].id;
+          cropId = insertedCrop.rows[0].id;
         } else {
           cropId = cropResult.rows[0].id;
         }
 
         const regResult = await dbClient.query<{ id: string }>(
           `INSERT INTO crop_registrations
-             (field_id, crop_id, variety_name, land_area_acres, sowing_date, farming_stage, status, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, 'active', $7)
+             (field_id, crop_id, variety_name, land_area_acres, sowing_date, season, farming_stage, notes, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
            RETURNING id`,
-          [fieldId, cropId, variety || null, area, resolvedStartDate, farmingStage, notes || null],
+          [
+            fieldId,
+            cropId,
+            variety?.trim() || null,
+            area,
+            resolvedStartDate,
+            season || "Kharif",
+            farmingStage,
+            notes?.trim() || null,
+          ],
         );
         registrationId = regResult.rows[0].id;
 
         const planResult = await dbClient.query<{ id: string }>(
-          `INSERT INTO crop_plans (crop_registration_id, plan_name, start_date, end_date, overall_progress_percentage, status)
-           VALUES ($1, $2, $3, $3 + INTERVAL '120 days', 0, 'in_progress')
+          `INSERT INTO crop_plans
+             (crop_registration_id, plan_name, start_date, overall_progress_percentage, status)
+           VALUES ($1, $2, $3, 0, 'in_progress')
            RETURNING id`,
-          [registrationId, `${cropName} Crop Plan`, resolvedStartDate],
+          [registrationId, `${cropName.trim()} Crop Care Plan`, resolvedStartDate],
         );
         planId = planResult.rows[0].id;
 
-        // Insert structured tasks into crop_tasks
+        const baseDate = new Date(resolvedStartDate);
         for (let i = 0; i < matchedTemplate.length; i++) {
           const task = matchedTemplate[i];
-          const fullNote = `${task.reasonWhy} | Action: ${task.suggestedAction}`;
+          const taskDueDate = new Date(baseDate);
+          taskDueDate.setDate(taskDueDate.getDate() + task.days);
 
           await dbClient.query(
-            `INSERT INTO crop_tasks (crop_plan_id, task_name, category, sequence_order, due_date, status, priority, notes)
-             VALUES ($1, $2, $3, $4, $5::date + ($6 || ' days')::interval, 'pending', $7, $8)`,
-            [planId, task.name, task.category, i + 1, resolvedStartDate, String(task.days), task.priority, fullNote],
+            `INSERT INTO crop_tasks
+               (crop_plan_id, task_name, description, due_date, sequence_order, category, priority, status, notes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)`,
+            [
+              planId,
+              task.name,
+              task.suggestedAction,
+              taskDueDate.toISOString().split("T")[0],
+              i + 1,
+              task.category,
+              task.priority,
+              task.reasonWhy,
+            ],
           );
 
           if (task.isPreventiveAlert && task.alertTitle && task.alertMessage) {
             await dbClient.query(
-              `INSERT INTO notifications (user_id, crop_registration_id, type, title, message, priority, is_read, action_url)
-               VALUES ($1, $2, $3, $4, $5, $6, FALSE, '/my-crops')`,
+              `INSERT INTO notifications
+                 (user_id, crop_registration_id, type, title, message, priority, action_url)
+               VALUES ($1, $2, $3, $4, $5, $6, '/my-crops')`,
               [
                 req.user!.id,
                 registrationId,
-                task.alertType || "crop_task_due",
+                task.alertType || "pest_alert",
                 task.alertTitle,
                 task.alertMessage,
                 task.priority === "urgent" ? "urgent" : "high",
@@ -666,7 +693,7 @@ router.post("/register", requireAuth, async (req, res) => {
       console.warn("[CROP-REGISTER] DB connection failed, using in-memory crop registry fallback:", poolErr);
     }
 
-    // Always register in memory store to ensure immediate availability and fast responses
+    // Register in memory store
     const newCrop: StoredCropRegistration = {
       id: registrationId,
       farmerId: req.user!.id,
@@ -680,7 +707,7 @@ router.post("/register", requireAuth, async (req, res) => {
       location: `${resolvedLocation}, ${resolvedDistrict}, ${resolvedState}`,
       farmName: `${resolvedLocation} Farm`,
       planId,
-      planName: `${cropName} Crop Care Plan`,
+      planName: `${cropName.trim()} Crop Care Plan`,
       progress: 0,
       createdAt: new Date().toISOString(),
     };
@@ -705,10 +732,21 @@ router.post("/register", requireAuth, async (req, res) => {
       });
     });
 
+    // ── Send SMS to farmer for preventive care schedule activation ───────
+    if (req.user?.phoneNumber) {
+      const smsMessage = `AgroScan: Crop care plan activated for ${cropName.trim()} (${rawArea} ${chosenUnit}). Your personalized stage-by-stage schedule & weather alerts are now live in AgroScan.`;
+      sendSMS(req.user.phoneNumber, smsMessage, "preventive_alert").catch((smsErr) => {
+        console.warn("[CROP-SMS] SMS dispatch warning:", smsErr);
+      });
+    }
+
     console.log("[CROP-REGISTER] Crop registered successfully:", {
       registrationId,
       planId,
       cropName,
+      landArea: rawArea,
+      landUnit: chosenUnit,
+      areaAcres: area,
       tasksGenerated: matchedTemplate.length,
       dbPersisted: dbSuccess,
     });
@@ -718,6 +756,11 @@ router.post("/register", requireAuth, async (req, res) => {
       registrationId,
       planId,
       cropName,
+      landArea: rawArea,
+      landUnit: chosenUnit,
+      landAreaAcres: area,
+      sowingDate: resolvedStartDate,
+      location: resolvedLocation,
       message: "Crop registered successfully with stage-by-stage care schedule & preventive alerts.",
     });
   } catch (error: any) {
@@ -725,6 +768,101 @@ router.post("/register", requireAuth, async (req, res) => {
     res.status(500).json({
       error: error?.message || "Failed to create crop care schedule. Please verify your details.",
     });
+  }
+});
+
+// ── PATCH /api/crops/:id — Edit Crop Details & Recalculate Tasks ──────────
+router.patch("/:id", requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      sowingDate,
+      location,
+      landArea,
+      landUnit,
+      variety,
+      farmingStage,
+    } = req.body as {
+      sowingDate?: string;
+      location?: string;
+      landArea?: number | string;
+      landUnit?: string;
+      variety?: string;
+      farmingStage?: string;
+    };
+
+    let targetCrop = inMemoryCrops.find((c) => c.id === id);
+
+    let normAcres: number | undefined;
+    if (landArea !== undefined) {
+      normAcres = normalizeLandArea(Number(landArea), landUnit).acres;
+    }
+
+    // 1. Update in DB if present
+    try {
+      if (sowingDate || normAcres !== undefined || variety !== undefined || farmingStage !== undefined) {
+        await query(
+          `UPDATE crop_registrations
+           SET sowing_date = COALESCE($1, sowing_date),
+               land_area_acres = COALESCE($2, land_area_acres),
+               variety_name = COALESCE($3, variety_name),
+               farming_stage = COALESCE($4, farming_stage),
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $5`,
+          [sowingDate || null, normAcres || null, variety || null, farmingStage || null, id],
+        );
+      }
+
+      if (sowingDate) {
+        // Recalculate task due dates in DB
+        const planRes = await query<{ id: string }>("SELECT id FROM crop_plans WHERE crop_registration_id = $1 LIMIT 1", [id]);
+        if (planRes.rows.length > 0) {
+          const planId = planRes.rows[0].id;
+          const tasksRes = await query<{ id: string; sequence_order: number }>(
+            "SELECT id, sequence_order FROM crop_tasks WHERE crop_plan_id = $1 ORDER BY sequence_order",
+            [planId],
+          );
+          const baseDate = new Date(sowingDate);
+          for (const t of tasksRes.rows) {
+            const newDate = new Date(baseDate);
+            newDate.setDate(newDate.getDate() + (t.sequence_order - 1) * 12);
+            await query("UPDATE crop_tasks SET due_date = $1 WHERE id = $2", [newDate.toISOString().split("T")[0], t.id]);
+          }
+        }
+      }
+    } catch (dbErr) {
+      console.warn("[CROP-PATCH] DB update fallback:", dbErr);
+    }
+
+    // 2. Update memory store
+    if (targetCrop) {
+      if (sowingDate) targetCrop.sowingDate = sowingDate;
+      if (normAcres !== undefined) targetCrop.landAreaAcres = normAcres;
+      if (variety !== undefined) targetCrop.varietyName = variety;
+      if (location) targetCrop.location = location;
+      if (farmingStage) targetCrop.farmingStage = farmingStage;
+
+      // Recalculate memory tasks
+      if (sowingDate && targetCrop.planId) {
+        const baseDate = new Date(sowingDate);
+        inMemoryTasks
+          .filter((t) => t.cropPlanId === targetCrop?.planId)
+          .forEach((t, i) => {
+            const nextDate = new Date(baseDate);
+            nextDate.setDate(nextDate.getDate() + i * 12);
+            t.date = nextDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+          });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "Crop details updated and care schedule dates recalculated successfully.",
+      crop: targetCrop,
+    });
+  } catch (error: any) {
+    console.error("[CROP-PATCH] Error:", error);
+    res.status(500).json({ error: error?.message || "Failed to update crop details" });
   }
 });
 

@@ -2,23 +2,52 @@ import { Router } from "express";
 
 const router = Router();
 
-// ── Agriculture-focused system prompt for LLM integration ───────────────
+// Language auto-detection helper
+export function detectLanguageFromText(text: string, fallback: string = "en"): string {
+  if (!text || !text.trim()) return fallback;
+
+  // Unicode character range checks for Indian scripts
+  if (/[\u0C00-\u0C7F]/.test(text)) return "te"; // Telugu
+  if (/[\u0B80-\u0BFF]/.test(text)) return "ta"; // Tamil
+  if (/[\u0C80-\u0CFF]/.test(text)) return "kn"; // Kannada
+  if (/[\u0D00-\u0D7F]/.test(text)) return "ml"; // Malayalam
+  if (/[\u0980-\u09FF]/.test(text)) return "bn"; // Bengali
+  if (/[\u0A80-\u0AFF]/.test(text)) return "gu"; // Gujarati
+  if (/[\u0A00-\u0A7F]/.test(text)) return "pa"; // Punjabi / Gurmukhi
+
+  // Devanagari could be Hindi or Marathi
+  if (/[\u0900-\u097F]/.test(text)) {
+    if (/\b(माझे|शेत|पीक|आहे|नाही|कसे|सांगा)\b/i.test(text)) return "mr";
+    return "hi";
+  }
+
+  // Transliterated romanized Telugu keywords
+  if (/\b(panta|purugu|aaku|pasupu|mandu|neellu|varsham|rythu|chelu|rogam|mokka)\b/i.test(text)) {
+    return "te";
+  }
+
+  // Transliterated romanized Hindi keywords
+  if (/\b(khet|kisaan|paani|baat|dawa|rog|keeda|khad|gehun|chawal|tamatar)\b/i.test(text)) {
+    return "hi";
+  }
+
+  return fallback;
+}
+
 const AGRICULTURE_SYSTEM_PROMPT = `You are AgroScan's expert agricultural advisor assistant for Indian farmers.
 
 RULES:
-- Respond ONLY about agriculture, crops, farming, pest/disease management, fertilizers, irrigation, weather impact on farming, soil health, and market prices for agricultural products.
+- Respond ONLY about agriculture, crops, farming, pest/disease management, fertilizers, irrigation, weather impact on farming, soil health, government farmer schemes, and market prices for agricultural products.
 - Be specific with dosages, timing, and product names when recommending treatments.
 - Always include both organic and chemical treatment options when applicable.
-- Respond in the language specified by the user's language preference.
-- Keep responses concise (under 200 words) and actionable.
-- If the question is not about farming, politely redirect to agricultural topics.
-- Reference the farmer's registered crops and location when relevant.
-- Use simple, farmer-friendly language — avoid complex scientific jargon.`;
+- CRITICAL: Respond in the EXACT language of the user's question (if they asked in Telugu, answer in Telugu; if in Hindi, answer in Hindi; if in Tamil, answer in Tamil, etc.).
+- Keep responses concise (under 200 words), warm, and actionable.
+- If the question is not about farming or rural livelihood, politely redirect to agricultural topics.
+- Use simple, farmer-friendly language.`;
 
-// ── Optional LLM call (OpenAI or Gemini) with explicit 6s timeout ────────
 async function callLLM(
   message: string,
-  language: string,
+  targetLang: string,
   farmerName: string,
   cropsStr: string,
   locationStr: string,
@@ -29,12 +58,13 @@ async function callLLM(
   const contextPrompt = `Farmer: ${farmerName}
 Registered crops: ${cropsStr || "Not specified"}
 Farm location: ${locationStr}
-Preferred language: ${language}
-Respond in the farmer's preferred language (language code: ${language}).
+Target Response Language: ${targetLang}
 
-Farmer's question: ${message}`;
+Farmer's query: ${message}
 
-  // 1. Try OpenAI with explicit 6s timeout
+Please provide an immediate, practical agronomic response in the target language (${targetLang}).`;
+
+  // 1. Try OpenAI (6s timeout)
   if (openaiKey) {
     try {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -56,9 +86,7 @@ Farmer's question: ${message}`;
       });
 
       if (res.ok) {
-        const data = (await res.json()) as {
-          choices?: Array<{ message?: { content?: string } }>;
-        };
+        const data = (await res.json()) as any;
         const reply = data.choices?.[0]?.message?.content?.trim();
         if (reply) return reply;
       }
@@ -67,7 +95,7 @@ Farmer's question: ${message}`;
     }
   }
 
-  // 2. Try Google Gemini with explicit 6s timeout
+  // 2. Try Google Gemini (6s timeout)
   if (geminiKey) {
     try {
       const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
@@ -84,11 +112,7 @@ Farmer's question: ${message}`;
       });
 
       if (res.ok) {
-        const data = (await res.json()) as {
-          candidates?: Array<{
-            content?: { parts?: Array<{ text?: string }> };
-          }>;
-        };
+        const data = (await res.json()) as any;
         const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
         if (reply) return reply;
       }
@@ -100,152 +124,113 @@ Farmer's question: ${message}`;
   return null;
 }
 
-// ── Built-in agronomy rule engine fallback ──────────────────────────────
-function getRuleBasedReply(message: string, language: string, farmerName: string): string {
-  const lower = message.toLowerCase();
+// Multilingual Rule-Based Agricultural Expert Engine
+function getRuleBasedAgronomyResponse(queryText: string, lang: string, cropName?: string): string {
+  const q = queryText.toLowerCase();
 
-  // Pest / Disease queries
-  if (lower.includes("blast") || lower.includes("blight") || lower.includes("fungus") || lower.includes("spots")) {
-    if (language === "te") {
-      return `నమస్తే ${farmerName}! ఆకుమచ్చ లేదా బ్లాస్ట్ తెగులు నివారణకు మాంకోజెబ్ (Mancozeb 75% WP @ 2 గ్రా/లీ) లేదా ట్రైసైక్లాజోల్ (Tricyclazole 75% WP @ 0.6 గ్రా/లీ) పిచికారీ చేయండి. సేంద్రీయ పద్ధతిలో ట్రైకోడెర్మా విరిడే లేదా వేప నూనె 10,000 ppm @ 2 మి.లీ/లీ వాడండి.`;
+  // 1. Blast / Fungal Leaf Spots
+  if (q.includes("blast") || q.includes("మచ్చ") || q.includes("blight") || q.includes("धब्बा") || q.includes("fungus")) {
+    if (lang === "te") {
+      return "వరి/పంటలో అగ్గి తెగులు లేదా ఆకు మచ్చలకు సిఫార్సు:\n1. సేంద్రీయ పద్ధతి: సూడోమోనాస్ ఫ్లోరోసెన్స్ 5 గ్రాములు లీటరు నీటికి కలిపి పిచికారీ చేయండి.\n2. రసాయన మందు: ట్రైసైక్లాజోల్ 75% WP (బీమ్) 0.6 గ్రా/లీటరు లేదా కాసుగామైసిన్ 1.5 మి.లీ/లీటరు పిచికారీ చేయండి.\n3. యూరియా (నత్రజని) వాడకాన్ని తగ్గించండి.";
     }
-    if (language === "hi") {
-      return `नमस्ते ${farmerName}! पत्ती धब्बा या झुलसा (ब्लास्ट) रोग के लिए मैंकोजेब (Mancozeb 75% WP @ 2 ग्राम/ली) या ट्राइसाइक्लाजोल (0.6 ग्राम/ली) का छिड़काव करें। जैविक उपाय में नीम तेल (10,000 ppm @ 2 मिली/ली) का उपयोग करें।`;
+    if (lang === "hi") {
+      return "झुलसा / पत्ती धब्बा रोग नियंत्रण:\n1. जैविक उपचार: स्यूडोमोनास फ्लोरोसेंस @ 5 ग्राम/लीटर का छिड़काव करें।\n2. रासायनिक उपचार: ट्राइसाइक्लाजोल 75% WP @ 0.6 ग्राम/लीटर या कासुगामाइसिन @ 1.5 मिली/लीटर का छिड़काव करें।\n3. अत्यधिक यूरिया का प्रयोग रोकें।";
     }
-    if (language === "ta") {
-      return `வணக்கம் ${farmerName}! இலைக்கருகல் அல்லது குலை நோய்க்கு மான்கோசெப் (Mancozeb 75% WP @ 2g/L) அல்லது டிரைசைக்ளசோல் (0.6g/L) தெளிக்கவும். இயற்கை முறையில் வேப்பெண்ணெய் (2ml/L) பயன்படுத்தவும்.`;
-    }
-    if (language === "kn") {
-      return `ನಮಸ್ಕಾರ ${farmerName}! ಎಲೆ ಚುಕ್ಕೆ ಅಥವಾ ಬೆಂಕಿ ರೋಗ ನಿಯಂತ್ರಣಕ್ಕೆ ಮ್ಯಾಂಕೋಜೆಬ್ (2g/L) ಅಥವಾ ಟ್ರೈಸೈಕ್ಲಾಜೋಲ್ (0.6g/L) ಸಿಂಪಡಿಸಿ. ಸಾವಯವವಾಗಿ ಬೇವಿನ ಎಣ್ಣೆ (2ml/L) ಬಳಸಿ.`;
-    }
-    if (language === "mr") {
-      return `नमस्कार ${farmerName}! करपा किंवा ब्लास्ट रोगाच्या नियंत्रणासाठी मॅनकोझेब (2 ग्रॅम/ली) किंवा ट्रायसायक्लॅझोल (0.6 ग्रॅम/ली) फवारा. सेंद्रिय नियंत्रणासाठी कडुनिंब तेल वापरा.`;
-    }
-    return `Hello ${farmerName}! For fungal leaf blast or blight spots, apply Mancozeb 75% WP @ 2g/L or Tricyclazole 75% WP @ 0.6g/L. For organic control, spray Neem Oil 10,000 ppm @ 2ml/L.`;
+    return "For leaf blast and fungal blight spots:\n1. Organic: Foliar spray of Pseudomonas fluorescens @ 5g/L or Trichoderma viride @ 5g/L.\n2. Chemical: Spray Tricyclazole 75% WP @ 0.6g/L or Kasugamycin @ 1.5ml/L.\n3. Avoid excess nitrogen (Urea) application during active infection.";
   }
 
-  // Fertilizer / Nutrient queries
-  if (lower.includes("fertilizer") || lower.includes("urea") || lower.includes("dap") || lower.includes("npk") || lower.includes("potash")) {
-    if (language === "te") {
-      return `ఎరువుల యాజమాన్యం: విత్తే సమయంలో బేసల్ డోస్‌గా DAP 50 కిలోలు + పొటాష్ 25 కిలోలు ఎకరాకు వేయండి. నాటిన 25 మరియు 45 రోజులలో యూరియా 25 కిలోలు చొప్పున వేయండి. వేప పూత పూసిన యూరియా వేయడం వల్ల నత్రజని నష్టం తగ్గుతుంది.`;
+  // 2. Yellow Leaves / Chlorosis / Micronutrients
+  if (q.includes("yellow") || q.includes("పసుపు") || q.includes("పీలా") || q.includes("chlorosis") || q.includes("मंजळ")) {
+    if (lang === "te") {
+      return "ఆకులు పసుపు రంగులోకి మారడానికి నివారణ:\n1. జింక్ లోపం ఉంటే: జింక్ సల్ఫేట్ 21% (2 గ్రా/లీటరు) లేదా చీలేటెడ్ జింక్ 1 గ్రా/లీటరు పిచికారీ చేయండి.\n2. ఇనుము లోపం ఉంటే: ఫెర్రస్ సల్ఫేట్ 5 గ్రా + నిమ్మ ఉప్పు 1 గ్రా లీటరు నీటికి కలపండి.\n3. వేరు పురుగు ఉంటే క్లోరిపైరిఫాస్ 2.5 మి.లీ/లీటరుతో పాదులు తడపండి.";
     }
-    if (language === "hi") {
-      return `उर्वरक प्रबंधन: बुवाई के समय बेसल खुराक के रूप में 50 किग्रा डीएपी + 25 किग्रा पोटाश प्रति एकड़ दें। 25 और 45 दिन बाद 25 किग्रा यूरिया की टॉप ड्रेसिंग करें।`;
+    if (lang === "hi") {
+      return "पत्तियों का पीलापन दूर करने के उपाय:\n1. जिंक की कमी: जिंक सल्फेट 21% @ 2 ग्राम/लीटर का छिड़काव करें।\n2. लोहे की कमी: फेरस सल्फेट 5 ग्राम + 1 ग्राम साइट्रिक एसिड प्रति लीटर पानी में मिलाकर छिड़कें।\n3. जड़ों में जलभराव न होने दें।";
     }
-    if (language === "ta") {
-      return `உர மேலாண்மை: விதைக்கும் போது டிஏபி 50 கிலோ + பொட்டாஷ் 25 கிலோ/ஏக்கர் இடவும். 25 மற்றும் 45 நாட்களில் 25 கிலோ யூரியா இடவும்.`;
-    }
-    if (language === "kn") {
-      return `ಗೊಬ್ಬರ ನಿರ್ವಹಣೆ: ಬಿತ್ತನೆ ಸಮಯದಲ್ಲಿ ಡಿಎಪಿ 50 ಕೆಜಿ + ಪೊಟ್ಯಾಶ್ 25 ಕೆಜಿ/ಎಕರೆಗೆ ಹಾಕಿ. 25 ಮತ್ತು 45 ದಿನಗಳಲ್ಲಿ ಯೂರಿಯಾ 25 ಕೆಜಿ ಸಿಂಪಡಿಸಿ.`;
-    }
-    if (language === "mr") {
-      return `खत व्यवस्थापन: पेरणीच्या वेळी 50 किलो डीएपी + 25 किलो पोटॅश प्रति एकर द्या. 25 आणि 45 दिवसांनी युरिया 25 किलो द्या.`;
-    }
-    return `Fertilizer schedule: Apply DAP 50 kg + MOP Potash 25 kg per acre as basal dose at sowing. Top dress with 25 kg Urea at 25 and 45 days after sowing.`;
+    return "For yellowing leaves (Chlorosis / Nutrient deficiency):\n1. Zinc deficiency: Spray Zinc Sulphate 21% @ 2g/L or Chelated Zinc @ 1g/L.\n2. Iron deficiency: Spray Ferrous Sulphate 5g + 1g Citric Acid per liter.\n3. Ensure proper root aeration and avoid water stagnation.";
   }
 
-  // Sucking pests / Insects
-  if (lower.includes("borer") || lower.includes("worm") || lower.includes("pest") || lower.includes("fly") || lower.includes("insect")) {
-    if (language === "te") {
-      return `కాండం తొలిచే పురుగు మరియు రసం పీల్చే పురుగుల నివారణకు క్లోరాంట్రానిలిప్రోల్ (Coragen @ 0.4 మి.లీ/లీ) లేదా ఇమిడాక్లోప్రిడ్ (0.5 మి.లీ/లీ) పిచికారీ చేయండి. పసుపు జిగురు అట్టలు ఎకరాకు 10 అమర్చండి.`;
+  // 3. Sucking Pests / Aphids / Thrips / Whiteflies
+  if (q.includes("pest") || q.includes("పురుగు") || q.includes("कीट") || q.includes("thrips") || q.includes("aphid") || q.includes("worm") || q.includes("curling")) {
+    if (lang === "te") {
+      return "రసం పీల్చే పురుగులు మరియు పేనుబంక నివారణ:\n1. సేంద్రీయ పద్ధతి: వేపనూనె 10,000 ppm 2-3 మి.లీ/లీటరు లేదా పసుపు/నీలం జిగురు అట్టలు (ఎకరానికి 12) పెట్టండి.\n2. రసాయన మందు: ఎసిటామిప్రిడ్ 20% SP 0.2 గ్రా/లీటరు లేదా ఇమిడాక్లోప్రిడ్ 17.8% SL 0.5 మి.లీ/లీటరు ఆకుల అడుగుభాగంలో పిచికారీ చేయండి.";
     }
-    if (language === "hi") {
-      return `तना छेदक और रस चूसक कीटों के लिए कोराजन (Coragen @ 0.4 मिली/ली) या इमिडाक्लोप्रिड (0.5 मिली/ली) का छिड़काव करें। पीले चिपचिपे ट्रैप 10 प्रति एकड़ लगाएं।`;
+    if (lang === "hi") {
+      return "रस चूसक कीट व माहू/थ्रिप्स नियंत्रण:\n1. जैविक: नीम का तेल 10,000 ppm @ 3 मिली/लीटर या पीले चिपचिपे ट्रैप (12 प्रति एकड़) लगाएं।\n2. रासायनिक: एसिटामिप्रिड 20% SP @ 0.2 ग्राम/लीटर या इमिडाक्लोप्रिड 17.8% SL @ 0.5 मिली/लीटर का छिड़काव करें।";
     }
-    if (language === "ta") {
-      return `தண்டு துளைப்பான் மற்றும் பூச்சிகளுக்கு கோராசன் (0.4ml/L) அல்லது இமிடாக்ளோபிரிட் (0.5ml/L) தெளிக்கவும். மஞ்சள் ஒட்டும் பொறிகளை வைக்கவும்.`;
-    }
-    if (language === "kn") {
-      return `ಕಾಂಡ ಕೊರೆಯುವ ಕೀಟಗಳಿಗೆ ಕೋರಾಜೆನ್ (0.4ml/L) ಅಥವಾ ಇಮಿಡಾಕ್ಲೋಪ್ರಿಡ್ (0.5ml/L) ಸಿಂಪಡಿಸಿ. ಹಳದಿ ಜಿಗುಟು ಬಲೆಗಳನ್ನು ಅಳವಡಿಸಿ.`;
-    }
-    if (language === "mr") {
-      return `खोडकिडा आणि किडींसाठी कोराजेन (0.4 मिली/ली) किंवा इमिडाक्लोप्रिड फवारा. पिवळे चिकट सापळे लावा.`;
-    }
-    return `For stem borer and sucking pest management, spray Chlorantraniliprole (Coragen 18.5% SC @ 0.4ml/L) or Imidacloprid 17.8% SL @ 0.5ml/L. Install yellow sticky traps @ 10/acre.`;
+    return "For sucking pests (Aphids, Thrips, Whitefly):\n1. Organic: Neem Oil 10,000 ppm @ 3ml/L and install 12 yellow sticky traps per acre.\n2. Chemical: Spray Acetamiprid 20% SP @ 0.2g/L or Imidacloprid 17.8% SL @ 0.5ml/L targeting undersides of leaves.";
   }
 
-  // Irrigation queries
-  if (lower.includes("water") || lower.includes("irrigation") || lower.includes("drainage")) {
-    if (language === "te") {
-      return `నీటి యాజమాన్యం: పైరు తొలిదశలో 2-3 సెం.మీ పలుచని నీరు నిలకడగా ఉంచండి. పూత మరియు గింజ పాలుపోసుకునే దశలో నేలలో తగినంత తేమ ఉండేలా చూసుకోండి. పొలంలో నీరు నిల్వ ఉండకుండా డ్రైనేజ్ సరిగ్గా ఉంచండి.`;
+  // 4. Fertilizer / Nutrition Guidance
+  if (q.includes("fertilizer") || q.includes("ఎరువు") || q.includes("खाद") || q.includes("urea") || q.includes("dap") || q.includes("potash")) {
+    if (lang === "te") {
+      return "పోషక యాజమాన్యం:\n1. ప్రాథమిక మోతాదు: నాట్లకు ముందు ఎకరానికి 50 కిలోల DAP + 25 కిలోల పొటాష్ వేయండి.\n2. పైపాటుగా: దుబ్బు చేసే దశలో 25 కిలోల యూరియాను 3 విడతలుగా వేయండి.\n3. పూత మరియు కాయ దశలో 19:19:19 లేదా 0:52:34 స్ప్రే చేయండి.";
     }
-    if (language === "hi") {
-      return `सिंचाई प्रबंधन: प्रारंभिक अवस्था में 2-3 सेमी उथला पानी रखें। फूल आने और दाना भरने के समय पर्याप्त नमी बनाए रखें। खेत में जलभराव न होने दें।`;
+    if (lang === "hi") {
+      return "संतुलित पोषण प्रबंधन:\n1. बुवाई के समय: 50 किग्रा DAP + 25 किग्रा पोटाश प्रति एकड़ दें।\n2. बढ़वार के समय: 25 किग्रा यूरिया को 2-3 बार में विभाजित करके दें।\n3. फूल और फल बनने के समय 19:19:19 पानी में घुलनशील खाद 5 ग्राम/लीटर स्प्रे करें।";
     }
-    if (language === "ta") {
-      return `நீர்ப்பாசனம்: தொடக்க கட்டத்தில் 2-3 செ.மீ நீர் வைத்திருக்கவும். பூக்கும் மற்றும் கதிர் வரும் போது சரியான ஈரப்பதம் பராமரிக்கவும்.`;
-    }
-    if (language === "kn") {
-      return `ನೀರಾವರಿ: ಆರಂಭಿಕ ಹಂತದಲ್ಲಿ 2-3 ಸೆಂ.ಮೀ ನೀರು ಇರಲಿ. ಹೂವಾಡುವ ಮತ್ತು ಕಾಳು ಕಟ್ಟುವ ಹಂತದಲ್ಲಿ ಮಣ್ಣಿನಲ್ಲಿ ತೇವಾಂಶ ಕಾಪಾಡಿಕೊಳ್ಳಿ.`;
-    }
-    if (language === "mr") {
-      return `सिंचन व्यवस्थापन: सुरुवातीला 2-3 सेमी पाणी ठेवा. फुलोरा आणि दाणे भरण्याच्या काळात ओलावा टिकवून ठेवा.`;
-    }
-    return `Irrigation advice: Maintain shallow standing water (2-3 cm) in early tillering. Ensure adequate moisture during flowering and grain fill stages. Provide drainage channels to avoid waterlogging.`;
+    return "Balanced Crop Nutrition Schedule:\n1. Basal dose: 50 kg DAP + 25 kg MOP Potash per acre at land preparation.\n2. Top dressing: Split Urea application into 2-3 equal doses at tillering and vegetative peak.\n3. Foliar booster: Spray 19:19:19 @ 5g/L during early vegetative and panicle initiation stages.";
   }
 
-  // Default helpful response
-  if (language === "te") {
-    return `నమస్తే ${farmerName}! మీ పంట రక్షణ, ఎరువుల మోతాదు, తెగుళ్ల నివారణ లేదా వాతావరణ సలహాల గురించి ఏదైనా అడగవచ్చు. ఉదాహరణకు: "వరిలో తెగుళ్ల నివారణ ఎలా?" అని అడగండి.`;
+  // 5. Default General Agronomic Welcome
+  if (lang === "te") {
+    return `నమస్కారం! నేను మీ ఆగ్రోస్కాన్ స్మార్ట్ వ్యవసాయ సలహాదారుని. మీ ${cropName || "పంట"} సంరక్షణ, ఎరువుల మోతాదులు, తెగుళ్ల నివారణ లేదా వాతావరణ సలహాల గురించి ఏదైనా అడగవచ్చు.`;
   }
-  if (language === "hi") {
-    return `नमस्ते ${farmerName}! आप अपनी फसल सुरक्षा, खाद की खुराक, कीट नियंत्रण या मौसम संबंधी सलाह के बारे में पूछ सकते हैं। उदाहरण: "धान में झुलसा रोग का इलाज क्या है?"`;
+  if (lang === "hi") {
+    return `नमस्ते! मैं आपका एग्रोस्कैन कृषि सलाहकार हूँ। आप अपनी ${cropName || "फसल"} की देखभाल, खाद की मात्रा, कीट नियंत्रण या मौसम के प्रभाव के बारे में कोई भी प्रश्न पूछ सकते हैं।`;
   }
-  if (language === "ta") {
-    return `வணக்கம் ${farmerName}! உங்கள் பயிர் பாதுகாப்பு, உர அளவு, பூச்சி கட்டுப்பாடு அல்லது வானிலை ஆலோசனை பற்றி கேட்கலாம்.`;
-  }
-  if (language === "kn") {
-    return `ನಮಸ್ಕಾರ ${farmerName}! ನಿಮ್ಮ ಬೆಳೆ ರಕ್ಷಣೆ, ಗೊಬ್ಬರದ ಪ್ರಮಾಣ, ಕೀಟ ನಿಯಂತ್ರಣ ಅಥವಾ ಹವಾಮಾನ ಸಲಹೆಗಳ ಬಗ್ಗೆ ನೀವು ಕೇಳಬಹುದು.`;
-  }
-  if (language === "mr") {
-    return `नमस्कार ${farmerName}! तुम्ही पीक संरक्षण, खतांचे प्रमाण, कीड नियंत्रण किंवा हवामान सल्ल्याबद्दल विचारू शकता.`;
-  }
-  return `Hello ${farmerName}! You can ask me about crop protection, fertilizer dosage, disease treatments, or irrigation advice. For example: "How to prevent blast in Paddy?" or "Best fertilizer for Tomato?"`;
+  return `Hello! I am your AgroScan agricultural advisor. You can ask me about crop care for your ${cropName || "farm"}, pest & disease treatments, fertilizer dosage, or weather advisories.`;
 }
 
-// ── POST /api/ai/chat ───────────────────────────────────────────────────
-router.post("/chat", async (req, res) => {
+// ── POST /api/ai/ask ─────────────────────────────────────────────────────
+router.post("/ask", async (req, res) => {
   try {
     const {
       message,
-      language = "en",
+      language: userPrefLang = "en",
       farmerName = "Farmer",
-      registeredCrops = [],
+      crops = [],
       location = "Andhra Pradesh",
     } = req.body as {
       message?: string;
       language?: string;
       farmerName?: string;
-      registeredCrops?: string[];
+      crops?: string[];
       location?: string;
     };
 
-    if (!message || typeof message !== "string" || !message.trim()) {
-      res.status(400).json({ error: "Message is required" });
+    if (!message || !message.trim()) {
+      res.status(400).json({ error: "Message cannot be empty." });
       return;
     }
 
-    const cropsStr = Array.isArray(registeredCrops) ? registeredCrops.join(", ") : "";
+    const trimmedMessage = message.trim();
+    const detectedLang = detectLanguageFromText(trimmedMessage, userPrefLang);
+    const cropsStr = Array.isArray(crops) ? crops.join(", ") : String(crops || "");
+    const primaryCrop = Array.isArray(crops) && crops.length > 0 ? crops[0] : undefined;
 
-    // 1. Try LLM first (with 6s timeout guard)
-    let reply = await callLLM(message.trim(), language, farmerName, cropsStr, location);
+    console.log(`[AI-ASSISTANT] Incoming query: "${trimmedMessage.slice(0, 50)}..." (prefLang=${userPrefLang}, detectedLang=${detectedLang})`);
 
-    // 2. Fall back to expert agronomy rule engine if LLM is unavailable or timed out
-    if (!reply) {
-      reply = getRuleBasedReply(message.trim(), language, farmerName);
+    // 1. Try real LLM with detected language
+    let answer = await callLLM(trimmedMessage, detectedLang, farmerName, cropsStr, location);
+
+    // 2. Fallback to expert agronomic engine
+    if (!answer) {
+      answer = getRuleBasedAgronomyResponse(trimmedMessage, detectedLang, primaryCrop);
     }
 
     res.json({
-      success: true,
-      reply,
-      language,
+      answer,
+      detectedLanguage: detectedLang,
+      timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    console.error("[AI-CHAT] Error:", error);
-    res.status(200).json({
-      success: true,
-      reply: getRuleBasedReply(req.body?.message || "", req.body?.language || "en", req.body?.farmerName || "Farmer"),
-      language: req.body?.language || "en",
+    console.error("[AI-ASSISTANT] Error:", error);
+    // Return graceful fallback rather than failing
+    res.json({
+      answer: "I am ready to assist with your farm queries. Please ask about pest control, fertilizer dosages, or irrigation scheduling.",
+      detectedLanguage: "en",
+      timestamp: new Date().toISOString(),
     });
   }
 });

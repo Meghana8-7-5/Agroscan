@@ -123,12 +123,40 @@ export type DashboardWeather = {
   location: string;
 };
 
+export type OtpResponse = {
+  success: boolean;
+  message: string;
+  cooldownSeconds: number;
+  devOtp?: string;
+};
+
+export type VerifyOtpResponse = {
+  success: boolean;
+  token: string;
+  isNewUser: boolean;
+  user: ApiUser;
+};
+
 export const authApi = {
+  sendOtp: (mobile: string, language?: string) =>
+    api.post<OtpResponse>("/auth/send-otp", { mobile, language }).then((r) => r.data),
+
+  verifyOtp: (mobile: string, otp: string) =>
+    api.post<VerifyOtpResponse>("/auth/verify-otp", { mobile, otp }).then((r) => r.data),
+
+  completeProfile: (data: {
+    fullName: string;
+    language: string;
+    villageCity?: string;
+    district?: string;
+    state?: string;
+  }) => api.post<{ success: boolean; token: string; user: ApiUser }>("/auth/complete-profile", data).then((r) => r.data),
+
   register: (data: {
     fullName: string;
     mobile: string;
-    email: string;
-    password: string;
+    email?: string;
+    password?: string;
     language: string;
     agree: boolean;
     role?: string;
@@ -154,6 +182,8 @@ export const authApi = {
 export const cropsApi = {
   list: () => api.get<CropRegistration[]>("/crops").then((r) => r.data),
   register: (data: Record<string, unknown>) => api.post("/crops/register", data).then((r) => r.data),
+  updateCrop: (id: string, data: Record<string, unknown>) =>
+    api.patch<{ success: boolean; message: string; crop: CropRegistration }>(`/crops/${id}`, data).then((r) => r.data),
   getTasks: (planId: string) => api.get<CropTask[]>(`/crops/plans/${planId}/tasks`).then((r) => r.data),
   updateTask: (taskId: string, status: "completed" | "pending") =>
     api.patch(`/crops/tasks/${taskId}`, { status }).then((r) => r.data),

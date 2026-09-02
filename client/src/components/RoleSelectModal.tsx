@@ -22,7 +22,7 @@ export default function RoleSelectModal() {
 
   const handleSelectFarmer = () => {
     setShowRoleSelectModal(false);
-    setLocation("/register");
+    setLocation("/login?role=farmer");
   };
 
   const handleSelectAdmin = () => {

@@ -2,6 +2,11 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { query } from "../db.js";
 import { requireAuth, signToken } from "../middleware/auth.js";
+import {
+  generateAndSendOtp,
+  verifyOtp,
+  normalizePhoneNumber,
+} from "../services/smsService.js";
 
 const router = Router();
 
@@ -44,7 +49,7 @@ interface StoredUser {
   full_name: string;
   phone_number: string;
   email: string | null;
-  password_hash: string;
+  password_hash?: string;
   preferred_language: string;
   role: string;
   is_active: boolean;
@@ -54,44 +59,13 @@ interface StoredUser {
 // In-memory user store fallback when PostgreSQL is offline
 const inMemoryUsers: StoredUser[] = [];
 
-function normalizePhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 10) return `+91${digits}`;
-  if (digits.startsWith("91") && digits.length === 12) return `+${digits}`;
-  if (raw.startsWith("+")) return raw.trim();
-  return `+91${digits}`;
-}
-
-// POST /api/auth/register
-router.post("/register", async (req, res) => {
+// ── 1. POST /api/auth/send-otp (Farmer Mobile OTP Request) ───────────────
+router.post("/send-otp", async (req, res) => {
   try {
-    const { fullName, mobile, email, password, language, agree, role } = req.body as {
-      fullName?: string;
-      mobile?: string;
-      email?: string;
-      password?: string;
-      language?: string;
-      agree?: boolean;
-      role?: string;
-    };
-
-    console.log("[AUTH-REGISTER] Request payload received:", {
-      fullName,
-      mobile,
-      email,
-      role: role || "farmer",
-      language,
-      agree: Boolean(agree),
-    });
-
-    // 1. Detailed field validations with specific user-friendly error messages
-    if (!fullName || !fullName.trim()) {
-      res.status(400).json({ error: "Please enter your full name." });
-      return;
-    }
+    const { mobile, language = "en" } = req.body as { mobile?: string; language?: string };
 
     if (!mobile || !mobile.trim()) {
-      res.status(400).json({ error: "Please enter your mobile number." });
+      res.status(400).json({ error: "Please enter your 10-digit mobile number." });
       return;
     }
 
@@ -101,33 +75,45 @@ router.post("/register", async (req, res) => {
       return;
     }
 
-    if (!email || !email.trim()) {
-      res.status(400).json({ error: "Please enter your email address." });
+    const normalizedLang = languageMap[language] || language || "en";
+    const result = await generateAndSendOtp(mobile, normalizedLang);
+
+    if (!result.success) {
+      res.status(429).json({ error: result.message, cooldownSeconds: result.cooldownSeconds });
       return;
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      res.status(400).json({ error: "Please enter a valid email address (e.g., name@domain.com)." });
+    res.json(result);
+  } catch (error: any) {
+    console.error("[AUTH-SEND-OTP] Error:", error);
+    res.status(500).json({ error: error?.message || "Failed to send OTP. Please try again." });
+  }
+});
+
+// ── 2. POST /api/auth/verify-otp (Farmer OTP Verification & Auto-Login) ──
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { mobile, otp } = req.body as { mobile?: string; otp?: string };
+
+    if (!mobile || !mobile.trim()) {
+      res.status(400).json({ error: "Mobile number is required." });
+      return;
+    }
+    if (!otp || !otp.trim()) {
+      res.status(400).json({ error: "Please enter the 6-digit OTP sent to your phone." });
       return;
     }
 
-    if (!password || password.length < 6) {
-      res.status(400).json({ error: "Password must be at least 6 characters." });
+    const verification = verifyOtp(mobile.trim(), otp.trim());
+    if (!verification.success) {
+      res.status(400).json({ error: verification.error || "Invalid OTP code." });
       return;
     }
 
-    if (!agree) {
-      res.status(400).json({ error: "Please accept the Terms & Conditions to create an account." });
-      return;
-    }
+    const phoneNumber = normalizePhoneNumber(mobile.trim());
+    const digits = mobile.replace(/\D/g, "");
 
-    const phoneNumber = normalizePhone(mobile);
-    const preferredLanguage = languageMap[language || "English"] || "en";
-    const passwordHash = await bcrypt.hash(password, 10);
-    const lowerEmail = email.trim().toLowerCase();
-    const assignedRole = role === "admin" || ADMIN_EMAILS.some((a) => a.toLowerCase() === lowerEmail) ? "admin" : "farmer";
-
-    let createdUser: {
+    let existingUser: {
       id: string;
       full_name: string;
       phone_number: string;
@@ -135,24 +121,10 @@ router.post("/register", async (req, res) => {
       role: string;
       preferred_language: string;
     } | null = null;
+    let isNewUser = false;
 
-    // 2. Try PostgreSQL database first
+    // 1. Try DB lookup
     try {
-      const existing = await query(
-        "SELECT id, phone_number, email FROM users WHERE phone_number = $1 OR LOWER(email) = $2",
-        [phoneNumber, lowerEmail],
-      );
-
-      if (existing.rows.length > 0) {
-        const match = existing.rows[0];
-        if (match.email && match.email.toLowerCase() === lowerEmail) {
-          res.status(409).json({ error: "An account with this email address already exists. Please log in." });
-          return;
-        }
-        res.status(409).json({ error: "An account with this mobile number already exists. Please log in." });
-        return;
-      }
-
       const result = await query<{
         id: string;
         full_name: string;
@@ -161,106 +133,202 @@ router.post("/register", async (req, res) => {
         role: string;
         preferred_language: string;
       }>(
-        `INSERT INTO users (full_name, phone_number, email, password_hash, preferred_language, terms_accepted, terms_accepted_at, role)
-         VALUES ($1, $2, $3, $4, $5, TRUE, CURRENT_TIMESTAMP, $6)
-         RETURNING id, full_name, phone_number, email, role, preferred_language`,
-        [fullName.trim(), phoneNumber, lowerEmail, passwordHash, preferredLanguage, assignedRole],
+        `SELECT id, full_name, phone_number, email, role, preferred_language
+         FROM users
+         WHERE phone_number = $1 OR RIGHT(REGEXP_REPLACE(phone_number, '[^0-9]', '', 'g'), 10) = $2
+         LIMIT 1`,
+        [phoneNumber, digits.slice(-10)],
       );
 
-      createdUser = result.rows[0];
-
-      // Auto-create initial farm record for farmer
-      try {
-        await query(
-          `INSERT INTO farms (farmer_id, farm_name, state, district, village_city, total_area_acres)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [createdUser.id, "My Farm", "Andhra Pradesh", "Guntur", "Gowdapalem", 5.0],
+      if (result.rows.length > 0) {
+        existingUser = result.rows[0];
+      } else {
+        // Create new user in DB
+        const defaultName = `Farmer ${digits.slice(-4)}`;
+        const insertRes = await query<{
+          id: string;
+          full_name: string;
+          phone_number: string;
+          email: string | null;
+          role: string;
+          preferred_language: string;
+        }>(
+          `INSERT INTO users (full_name, phone_number, preferred_language, terms_accepted, role)
+           VALUES ($1, $2, 'en', TRUE, 'farmer')
+           RETURNING id, full_name, phone_number, email, role, preferred_language`,
+          [defaultName, phoneNumber],
         );
-      } catch (farmErr) {
-        console.warn("[AUTH-REGISTER] Could not auto-create farm:", farmErr);
+        existingUser = insertRes.rows[0];
+        isNewUser = true;
+
+        // Auto-seed default farm for new farmer
+        try {
+          await query(
+            `INSERT INTO farms (farmer_id, farm_name, state, district, village_city, total_area_acres)
+             VALUES ($1, $2, 'Andhra Pradesh', 'Guntur', 'My Village', 2.5)`,
+            [existingUser.id, "My Farm"],
+          );
+        } catch {}
       }
     } catch (dbErr) {
-      console.warn("[AUTH-REGISTER] Database unavailable, using in-memory user registry fallback:", dbErr);
-
-      // Check duplicate in memory store
-      const existingMem = inMemoryUsers.find(
-        (u) => u.phone_number === phoneNumber || (u.email && u.email.toLowerCase() === lowerEmail),
-      );
-
-      if (existingMem) {
-        if (existingMem.email && existingMem.email.toLowerCase() === lowerEmail) {
-          res.status(409).json({ error: "An account with this email address already exists. Please log in." });
-          return;
-        }
-        res.status(409).json({ error: "An account with this mobile number already exists. Please log in." });
-        return;
-      }
-
-      const memUser: StoredUser = {
-        id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        full_name: fullName.trim(),
-        phone_number: phoneNumber,
-        email: lowerEmail,
-        password_hash: passwordHash,
-        preferred_language: preferredLanguage,
-        role: assignedRole,
-        is_active: true,
-        created_at: new Date().toISOString(),
-      };
-
-      inMemoryUsers.push(memUser);
-      createdUser = {
-        id: memUser.id,
-        full_name: memUser.full_name,
-        phone_number: memUser.phone_number,
-        email: memUser.email,
-        role: memUser.role,
-        preferred_language: memUser.preferred_language,
-      };
+      console.warn("[AUTH-VERIFY-OTP] Database lookup/insert fallback to in-memory:", dbErr);
     }
 
-    if (!createdUser) {
-      res.status(500).json({ error: "Unable to create account. Please try again." });
-      return;
+    // 2. Fallback to in-memory store if DB was unreachable
+    if (!existingUser) {
+      const memMatch = inMemoryUsers.find((u) => {
+        const uDigits = u.phone_number.replace(/\D/g, "");
+        return u.phone_number === phoneNumber || (digits.length >= 10 && uDigits.endsWith(digits.slice(-10)));
+      });
+
+      if (memMatch) {
+        existingUser = {
+          id: memMatch.id,
+          full_name: memMatch.full_name,
+          phone_number: memMatch.phone_number,
+          email: memMatch.email,
+          role: memMatch.role,
+          preferred_language: memMatch.preferred_language,
+        };
+      } else {
+        const newMemUser: StoredUser = {
+          id: `farmer_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          full_name: `Farmer ${digits.slice(-4)}`,
+          phone_number: phoneNumber,
+          email: null,
+          preferred_language: "en",
+          role: "farmer",
+          is_active: true,
+          created_at: new Date().toISOString(),
+        };
+        inMemoryUsers.push(newMemUser);
+        existingUser = {
+          id: newMemUser.id,
+          full_name: newMemUser.full_name,
+          phone_number: newMemUser.phone_number,
+          email: newMemUser.email,
+          role: newMemUser.role,
+          preferred_language: newMemUser.preferred_language,
+        };
+        isNewUser = true;
+      }
     }
 
     const token = signToken({
-      id: createdUser.id,
-      fullName: createdUser.full_name,
-      phoneNumber: createdUser.phone_number,
-      email: createdUser.email,
-      role: createdUser.role,
-      preferredLanguage: createdUser.preferred_language,
+      id: existingUser.id,
+      fullName: existingUser.full_name,
+      phoneNumber: existingUser.phone_number,
+      email: existingUser.email,
+      role: existingUser.role,
+      preferredLanguage: existingUser.preferred_language,
     });
 
-    console.log("[AUTH-REGISTER] Registration successful for:", createdUser.id, createdUser.full_name, createdUser.role);
+    console.log(`[AUTH-VERIFY-OTP] Verified farmer: ${existingUser.phone_number} (isNewUser=${isNewUser})`);
 
-    res.status(201).json({
+    res.json({
+      success: true,
       token,
+      isNewUser,
       user: {
-        id: createdUser.id,
-        fullName: createdUser.full_name,
-        phoneNumber: createdUser.phone_number,
-        email: createdUser.email,
-        role: createdUser.role,
-        preferredLanguage: createdUser.preferred_language,
+        id: existingUser.id,
+        fullName: existingUser.full_name,
+        phoneNumber: existingUser.phone_number,
+        email: existingUser.email,
+        role: existingUser.role,
+        preferredLanguage: existingUser.preferred_language,
       },
     });
   } catch (error: any) {
-    console.error("[AUTH-REGISTER] Unexpected error during registration:", error);
-    res.status(500).json({
-      error: error?.message || "Registration failed due to a server error. Please try again.",
-    });
+    console.error("[AUTH-VERIFY-OTP] Error:", error);
+    res.status(500).json({ error: error?.message || "OTP verification failed. Please try again." });
   }
 });
 
-// POST /api/auth/login
+// ── 3. POST /api/auth/complete-profile (Minimal One-Time Setup for New Farmers)
+router.post("/complete-profile", requireAuth, async (req, res) => {
+  try {
+    const { fullName, language, villageCity, district, state } = req.body as {
+      fullName?: string;
+      language?: string;
+      villageCity?: string;
+      district?: string;
+      state?: string;
+    };
+
+    if (!fullName || !fullName.trim()) {
+      res.status(400).json({ error: "Please enter your name." });
+      return;
+    }
+
+    const prefLang = languageMap[language || "English"] || language || "en";
+    const name = fullName.trim();
+
+    // 1. Update DB user
+    try {
+      await query(
+        `UPDATE users
+         SET full_name = $1, preferred_language = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE id = $3`,
+        [name, prefLang, req.user!.id],
+      );
+
+      if (villageCity || district) {
+        const farmRes = await query("SELECT id FROM farms WHERE farmer_id = $1 LIMIT 1", [req.user!.id]);
+        if (farmRes.rows.length > 0) {
+          await query(
+            `UPDATE farms SET village_city = COALESCE($1, village_city), district = COALESCE($2, district), state = COALESCE($3, state)
+             WHERE id = $4`,
+            [villageCity || null, district || null, state || null, farmRes.rows[0].id],
+          );
+        } else {
+          await query(
+            `INSERT INTO farms (farmer_id, farm_name, state, district, village_city, total_area_acres)
+             VALUES ($1, 'My Farm', $2, $3, $4, 2.5)`,
+            [req.user!.id, state || "Andhra Pradesh", district || "Guntur", villageCity || "My Village"],
+          );
+        }
+      }
+    } catch (dbErr) {
+      console.warn("[AUTH-COMPLETE-PROFILE] DB update skipped:", dbErr);
+    }
+
+    // 2. Update memory store
+    const memUser = inMemoryUsers.find((u) => u.id === req.user!.id);
+    if (memUser) {
+      memUser.full_name = name;
+      memUser.preferred_language = prefLang;
+    }
+
+    const updatedUser = {
+      id: req.user!.id,
+      fullName: name,
+      phoneNumber: req.user!.phoneNumber,
+      email: req.user!.email,
+      role: req.user!.role,
+      preferredLanguage: prefLang,
+    };
+
+    const token = signToken(updatedUser);
+
+    res.json({
+      success: true,
+      token,
+      user: updatedUser,
+      message: "Profile updated successfully.",
+    });
+  } catch (error: any) {
+    console.error("[AUTH-COMPLETE-PROFILE] Error:", error);
+    res.status(500).json({ error: error?.message || "Failed to save profile." });
+  }
+});
+
+// ── 4. POST /api/auth/login (Preserved for Admin Login with Password) ────
 router.post("/login", async (req, res) => {
   try {
     const { identifier, password } = req.body as { identifier?: string; password?: string };
 
     if (!identifier?.trim() || !password) {
-      res.status(400).json({ error: "Please enter your mobile/email and password." });
+      res.status(400).json({ error: "Please enter your credentials." });
       return;
     }
 
@@ -293,7 +361,7 @@ router.post("/login", async (req, res) => {
     }
 
     const isEmail = trimmed.includes("@");
-    const phoneNumber = isEmail ? null : normalizePhone(trimmed);
+    const phoneNumber = isEmail ? null : normalizePhoneNumber(trimmed);
 
     // 1. Try DB login
     try {
@@ -309,13 +377,8 @@ router.post("/login", async (req, res) => {
       }>(
         isEmail
           ? "SELECT * FROM users WHERE LOWER(email) = LOWER($1)"
-          : "SELECT * FROM users WHERE phone_number = $1 OR phone_number = $2 OR phone_number = $3 OR RIGHT(REGEXP_REPLACE(phone_number, '[^0-9]', '', 'g'), 10) = $4",
-        [
-          isEmail ? trimmed : phoneNumber,
-          trimmed,
-          `+91${trimmed.replace(/\D/g, "")}`,
-          trimmed.replace(/\D/g, "").slice(-10),
-        ],
+          : "SELECT * FROM users WHERE phone_number = $1 OR phone_number = $2 OR RIGHT(REGEXP_REPLACE(phone_number, '[^0-9]', '', 'g'), 10) = $3",
+        [isEmail ? trimmed : phoneNumber, trimmed, trimmed.replace(/\D/g, "").slice(-10)],
       );
 
       const dbUser = result.rows[0];
@@ -361,7 +424,7 @@ router.post("/login", async (req, res) => {
       );
     });
 
-    if (memUser && memUser.is_active) {
+    if (memUser && memUser.is_active && memUser.password_hash) {
       const valid = await bcrypt.compare(password, memUser.password_hash);
       if (valid) {
         const token = signToken({
@@ -395,7 +458,108 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// GET /api/auth/me
+// ── 5. POST /api/auth/register (Full registration backward compatibility)
+router.post("/register", async (req, res) => {
+  try {
+    const { fullName, mobile, email, password, language, agree, role } = req.body as {
+      fullName?: string;
+      mobile?: string;
+      email?: string;
+      password?: string;
+      language?: string;
+      agree?: boolean;
+      role?: string;
+    };
+
+    if (!mobile || !mobile.trim()) {
+      res.status(400).json({ error: "Please enter your mobile number." });
+      return;
+    }
+
+    const phoneNumber = normalizePhoneNumber(mobile);
+    const prefLang = languageMap[language || "English"] || "en";
+    const passwordHash = password ? await bcrypt.hash(password, 10) : undefined;
+    const lowerEmail = email ? email.trim().toLowerCase() : null;
+    const assignedRole = role === "admin" || (lowerEmail && ADMIN_EMAILS.some((a) => a.toLowerCase() === lowerEmail)) ? "admin" : "farmer";
+    const name = (fullName || `Farmer ${mobile.slice(-4)}`).trim();
+
+    let createdUser: {
+      id: string;
+      full_name: string;
+      phone_number: string;
+      email: string | null;
+      role: string;
+      preferred_language: string;
+    } | null = null;
+
+    try {
+      const result = await query<{
+        id: string;
+        full_name: string;
+        phone_number: string;
+        email: string | null;
+        role: string;
+        preferred_language: string;
+      }>(
+        `INSERT INTO users (full_name, phone_number, email, password_hash, preferred_language, terms_accepted, terms_accepted_at, role)
+         VALUES ($1, $2, $3, $4, $5, TRUE, CURRENT_TIMESTAMP, $6)
+         ON CONFLICT (phone_number) DO UPDATE
+         SET full_name = EXCLUDED.full_name, preferred_language = EXCLUDED.preferred_language
+         RETURNING id, full_name, phone_number, email, role, preferred_language`,
+        [name, phoneNumber, lowerEmail, passwordHash || null, prefLang, assignedRole],
+      );
+      createdUser = result.rows[0];
+    } catch (dbErr) {
+      console.warn("[AUTH-REGISTER] DB fallback:", dbErr);
+      const memUser: StoredUser = {
+        id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        full_name: name,
+        phone_number: phoneNumber,
+        email: lowerEmail,
+        password_hash: passwordHash,
+        preferred_language: prefLang,
+        role: assignedRole,
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      inMemoryUsers.push(memUser);
+      createdUser = {
+        id: memUser.id,
+        full_name: memUser.full_name,
+        phone_number: memUser.phone_number,
+        email: memUser.email,
+        role: memUser.role,
+        preferred_language: memUser.preferred_language,
+      };
+    }
+
+    const token = signToken({
+      id: createdUser.id,
+      fullName: createdUser.full_name,
+      phoneNumber: createdUser.phone_number,
+      email: createdUser.email,
+      role: createdUser.role,
+      preferredLanguage: createdUser.preferred_language,
+    });
+
+    res.status(201).json({
+      token,
+      user: {
+        id: createdUser.id,
+        fullName: createdUser.full_name,
+        phoneNumber: createdUser.phone_number,
+        email: createdUser.email,
+        role: createdUser.role,
+        preferredLanguage: createdUser.preferred_language,
+      },
+    });
+  } catch (error: any) {
+    console.error("[AUTH-REGISTER] Error:", error);
+    res.status(500).json({ error: error?.message || "Registration failed. Please try again." });
+  }
+});
+
+// ── 6. GET /api/auth/me ─────────────────────────────────────────────────
 router.get("/me", requireAuth, async (req, res) => {
   try {
     if (req.user?.email && ADMIN_EMAILS.some((a) => a.toLowerCase() === req.user?.email?.toLowerCase())) {
@@ -452,7 +616,6 @@ router.get("/me", requireAuth, async (req, res) => {
       return;
     }
 
-    // Fallback to token payload
     res.json({
       id: req.user!.id,
       fullName: req.user!.fullName,
@@ -467,7 +630,7 @@ router.get("/me", requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/auth/language — sync farmer's preferred language
+// ── 7. PATCH /api/auth/language ─────────────────────────────────────────
 router.patch("/language", requireAuth, async (req, res) => {
   try {
     const { language } = req.body as { language?: string };
@@ -492,7 +655,7 @@ router.patch("/language", requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /api/auth/location — persist resolved GPS/manual location
+// ── 8. PATCH /api/auth/location ─────────────────────────────────────────
 router.patch("/location", requireAuth, async (req, res) => {
   try {
     const { latitude, longitude, villageCity, district, state } = req.body as {

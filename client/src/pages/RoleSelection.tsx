@@ -12,7 +12,7 @@ export default function RoleSelection() {
   const [, setLocation] = useLocation();
 
   const handleSelectFarmer = () => {
-    setLocation("/register");
+    setLocation("/login?role=farmer");
   };
 
   const handleSelectAdmin = () => {

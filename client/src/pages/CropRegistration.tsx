@@ -1,64 +1,88 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 import {
   ArrowLeft,
   ArrowRight,
-  CalendarDays,
+  Calendar,
   Check,
-  ChevronDown,
+  CheckCircle2,
+  ChevronRight,
   CircleHelp,
   Droplets,
+  Layers,
   Leaf,
-  LocateFixed,
+  LoaderCircle,
   MapPin,
   Mountain,
+  Plus,
+  ShieldCheck,
+  Sparkles,
   Sprout,
-  Tractor,
   Wheat,
-  ShieldCheck
+  X
 } from "lucide-react";
-import { cropsApi, getApiErrorMessage } from "@/lib/api";
+import { cropsApi } from "@/lib/api";
+import { CROPS_DATABASE, CropData } from "../data/cropsDatabase";
+import { useLocationContext } from "@/contexts/LocationContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { localizeCrop } from "@/lib/i18n";
+import { localizeCrop, localizeCategory } from "@/lib/i18n";
 import EditableFrame from "@/components/EditableFrame";
 
-const PROCESS_TRANSLATIONS: Record<string, Record<string, string>> = {
-  Ploughing: { en: "Ploughing", te: "దుక్కి దున్నడం (Ploughing)", hi: "खेत की जुताई", ta: "உழுதல்", kn: "ಉಳುಮೆ", mr: "नांगरणी", pa: "ਵਾਹੀ", bn: "জমি চাষ", gu: "ખેડ", ml: "നിലമുഴുൽ" },
-  Seeding: { en: "Seeding / Sowing", te: "విత్తడం / నాట్లు (Seeding)", hi: "बुवाई / रोपाई", ta: "விதைப்பு", kn: "ಬಿತ್ತನೆ", mr: "पेरणी", pa: "ਬਿਜਾਈ", bn: "বপন", gu: "વાવણી", ml: "വിത്ത് വിതയ്ക്കൽ" },
-  Irrigation: { en: "Irrigation", te: "నీటి తడులు (Irrigation)", hi: "सिंचाई", ta: "நீர்ப்பாசனம்", kn: "ನೀರಾವರಿ", mr: "सिंचन", pa: "ਸਿੰਚਾਈ", bn: "সেচ", gu: "પિયત", ml: "നനയ്ക്കൽ" },
-  "None yet": { en: "None yet", te: "ఇంకా ప్రారంభించలేదు", hi: "अभी शुरू नहीं हुआ", ta: "இன்னும் தொடங்கவில்லை", kn: "ಇನ್ನೂ ಪ್ರಾರಂಭವಾಗಿಲ್ಲ", mr: "अजून नाही", pa: "ਹਾਲੇ ਨਹੀਂ", bn: "এখনও নয়", gu: "હજી નથી", ml: "ഇതുവരെയില്ല" },
-};
+const leafImage = "/manus-storage/agroscan-leaf-stock_de49ea7d.jpg";
 
 const STEP_LABELS: Record<string, string[]> = {
-  en: ["Location", "Crop details", "Farming process", "Review", "Complete"],
-  te: ["పొలం స్థలం", "పంట వివరాలు", "వ్యవసాయ దశ", "సమీక్ష", "పూర్తయింది"],
-  hi: ["खेत स्थान", "फसल विवरण", "कृषि प्रक्रिया", "समीक्षा", "पूर्ण"],
-  ta: ["இருப்பிடம்", "பயிர் விவரங்கள்", "விவசாய முறை", "சரிபார்த்தல்", "முடிந்தது"],
-  kn: ["ಸ್ಥಳ", "ಬೆಳೆ ವಿವರಗಳು", "ಕೃಷಿ ಹಂತ", "ಪರಿಶೀಲನೆ", "ಪೂರ್ಣ"],
-  mr: ["स्थान", "पीक तपशील", "शेती प्रक्रिया", "पुನरावलोकन", "पूर्ण"],
-  pa: ["ਸਥਾਨ", "ਫਸਲ ਦੇ ਵੇਰਵੇ", "ਖੇਤੀ ਪ੍ਰਕਿਰਿਆ", "ਸਮੀਖਿਆ", "ਮੁਕੰਮਲ"],
-  bn: ["অবস্থান", "ফসলের বিবরণ", "কৃষি প্রক্রিয়া", "পর্যালোচনা", "সম্পূর্ণ"],
-  gu: ["સ્થળ", "પાકની વિગત", "ખેતી પ્રક્રિયા", "સમીક્ષા", "પૂર્ણ"],
-  ml: ["സ്ഥലം", "വിള വിവരങ്ങൾ", "കൃഷി രീതി", "പരിശോധന", "പൂർത്തിയായി"],
+  en: ["Basic Field Info", "Select Crop & Season", "Farming Stage", "Review & Create Plan", "Plan Created"],
+  te: ["పొలం ప్రాథమిక సమాచారం", "పంట & సీజన్ ఎంపిక", "సాగు దశ", "సమీక్షించి షెడ్యూల్ రూపొందించండి", "ప్రణాళిక సిద్ధమైంది"],
+  hi: ["खेत की बुनियादी जानकारी", "फसल और मौसम चयन", "खेती का चरण", "समीक्षा व योजना निर्माण", "योजना तैयार"],
+  ta: ["பண்ணை அடிப்படை தகவல்", "பயிர் & பருவம் தேர்வு", "விவசாய நிலை", "மதிப்பாய்வு & திட்டம்", "திட்டம் தயார்"],
+  kn: ["ಜಮೀನಿನ ಮೂಲ ಮಾಹಿತಿ", "ಬೆಳೆ & ಋತು ಆಯ್ಕೆ", "ಕೃಷಿ ಹಂತ", "ಪರಿಶೀಲನೆ & ಯೋಜನೆ", "ಯೋಜನೆ ಸಿದ್ಧ"],
+  mr: ["शेताची मूलभूत माहिती", "पीक व हंगाम निवड", "शेतीचा टप्पा", "पुनरावलोकन व योजना", "योजना तयार"],
+  pa: ["ਖੇਤ ਦੀ ਮੁੱਢਲੀ ਜਾਣਕਾਰੀ", "ਫਸਲ ਤੇ ਸੀਜ਼ਨ ਚੋਣ", "ਖੇਤੀ ਦਾ ਪੜਾਅ", "ਸਮੀਖਿਆ ਤੇ ਯੋਜਨਾ", "ਯੋਜਨਾ ਤਿਆਰ"],
+  bn: ["খামারের প্রাথমিক তথ্য", "ফসল ও মৌসুম নির্বাচন", "চাষের পর্যায়", "পর্যালোচনা ও পরিকল্পনা", "পরিকল্পনা তৈরি"],
+  gu: ["ખેતરની પ્રાથમિક માહિતી", "પાક અને મોસમ પસંદગી", "ખેતીનો તબક્કો", "સમીક્ષા અને યોજના", "યોજના તૈયાર"],
+  ml: ["കൃഷിയിട അടിസ്ഥാന വിവരങ്ങൾ", "വിള & സീസൺ തിരഞ്ഞെടുപ്പ്", "കൃഷി ഘട്ടം", "പ്ലാൻ തയ്യാറാക്കുക", "പ്ലാൻ തയ്യാറായി"],
 };
 
 const REG_STRINGS: Record<string, Record<string, string>> = {
-  eyebrow: { en: "Add a new field note", te: "కొత్త పంట క్షేత్ర నమోదు", hi: "नया खेत विवरण जोड़ें", ta: "புதிய பண்ணை பதிவு", kn: "ಹೊಸ ಜಮೀನು ನೋಂದಣಿ", mr: "नवीन शेत नोंद", pa: "ਨਵਾਂ ਖੇਤ ਨੋਟ", bn: "নতুন খামার নোট", gu: "નવી ખેતર નોંધ", ml: "പുതിയ കൃഷി വിവരങ്ങൾ" },
-  title: { en: "Register your crop.", te: "మీ పంటను నమోదు చేసుకోండి.", hi: "अपनी फसल दर्ज करें।", ta: "உங்கள் பயிரைப் பதிவு செய்யுங்கள்.", kn: "ನಿಮ್ಮ ಬೆಳೆಯನ್ನು ನೋಂದಾಯಿಸಿ.", mr: "तुमचे पीक नोंदवा.", pa: "ਆਪਣੀ ਫਸਲ ਦਰਜ ਕਰੋ।", bn: "আপনার ফসল নিবন্ধন করুন।", gu: "તમારો પાક નોંધાવો.", ml: "നിങ്ങളുടെ വിള രജിസ്റ്റർ ചെയ്യുക." },
-  lede: { en: "Tell us a little about the field. We’ll use it to shape your personalized crop plan.", te: "మీ పొలం వివరాలను తెలపండి. దీని ఆధారంగా దశలవారీ సంరక్షణ ప్రణాళికను తయారు చేస్తాము.", hi: "खेत के बारे में विवरण दें। हम इसके आधार पर आपकी व्यक्तिगत फसल योजना बनाएंगे।", ta: "உங்கள் வயல் பற்றிய தகவல்களைத் தெரிவிக்கவும்.", kn: "ನಿಮ್ಮ ಜಮೀನಿನ ಮಾಹಿತಿ ನೀಡಿ. ನಾವು ನಿಮಗಾಗಿ ಆರೈಕೆ ವೇಳಾಪಟ್ಟಿ ರಚಿಸುತ್ತೇವೆ.", mr: "शेताची माहिती द्या. आम्ही वैयक्तिक पीक नियोजन तयार करू.", pa: "ਆਪਣੇ ਖੇਤ ਬਾਰੇ ਦੱਸੋ। ਅਸੀਂ ਫਸਲ ਯੋਜਨਾ ਤਿਆਰ ਕਰਾਂਗੇ।", bn: "খামারের বিবরণ দিন। আমরা ফসল পরিকল্পনা তৈরি করব।", gu: "ખેતરની વિગત આપો. અમે પાક યોજના બનાવીશું.", ml: "കൃഷി വിവരങ്ങൾ നൽകുക. ഞങ്ങൾ പരിപാലന പ്ലാൻ തയാറാക്കും." },
-  next: { en: "Next step", te: "తరువాతి దశ", hi: "अगला चरण", ta: "அடுத்த படி", kn: "ಮುಂದಿನ ಹಂತ", mr: "पुढील पायरी", pa: "ਅਗਲਾ ਕਦਮ", bn: "পরবর্তী ধাপ", gu: "આગલું પગલું", ml: "അടുത്ത ഘട്ടം" },
-  back: { en: "Back", te: "వెనుకకు", hi: "पीछे", ta: "பின்னால்", kn: "ಹಿಂದಕ್ಕೆ", mr: "मागे", pa: "ਪਿੱਛੇ", bn: "পেছনে", gu: "પાછળ", ml: "പിന്നോട്ട്" },
-  create_plan: { en: "Create crop plan & alerts", te: "పంట ప్రణాళిక & హెచ్చరికలను సృష్టించండి", hi: "फसल योजना व अलर्ट बनाएं", ta: "பயிர் திட்டம் & எச்சரிக்கைகளை உருவாக்கு", kn: "ಬೆಳೆ ಯೋಜನೆ & ಎಚ್ಚರಿಕೆಗಳನ್ನು ರಚಿಸಿ", mr: "पीक नियोजन व सूचना तयार करा", pa: "ਫਸਲ ਯੋਜਨਾ ਤੇ ਅਲਰਟ ਬਣਾਓ", bn: "ফসল পরিকল্পনা ও সতর্কতা তৈরি করুন", gu: "પાક યોજના અને ચેતવણી બનાવો", ml: "വിള പ്ലാൻ & അലേർട്ടുകൾ ഉണ്ടാക്കുക" },
-  creating: { en: "Creating Care Schedule…", te: "సంరక్షణ షెడ్యూల్ రూపొందిస్తున్నాము…", hi: "देखभाल अनुसूची तैयार हो रही है…", ta: "பராமரிப்பு திட்டம் தயாராகிறது…", kn: "ಆರೈಕೆ ವೇಳಾಪಟ್ಟಿ ಸಿದ್ಧವಾಗುತ್ತಿದೆ…", mr: "नियोजन तयार होत आहे…", pa: "ਸਮਾਂ-ਸਾਰਣੀ ਤਿਆਰ ਹੋ ਰਹੀ ਹੈ…", bn: "পরিকল্পনা তৈরি হচ্ছে…", gu: "યોજના બની રહી છે…", ml: "പ്ലാൻ തയ്യാറാക്കുന്നു…" },
-  view_plan: { en: "View my crop plan", te: "నా పంట ప్రణాళికను చూడండి", hi: "मेरी फसल योजना देखें", ta: "எனது பயிர் திட்டத்தைக் காண்க", kn: "ನನ್ನ ಬೆಳೆ ಯೋಜನೆ ವೀಕ್ಷಿಸಿ", mr: "माझे पीक नियोजन पहा", pa: "ਮੇਰੀ ਫਸਲ ਯੋਜਨਾ ਦੇਖੋ", bn: "আমার ফসল পরিকল্পনা দেখুন", gu: "મારી પાક યોજના જુઓ", ml: "വിള പ്ലാൻ കാണുക" },
-  ready_msg: { en: "Your crop care schedule is ready.", te: "మీ పంట సంరక్షణ షెడ్యూల్ సిద్ధంగా ఉంది.", hi: "आपकी फसल देखभाल अनुसूची तैयार है।", ta: "உங்கள் பயிர் பராமரிப்பு அட்டவணை தயாராக உள்ளது.", kn: "ನಿಮ್ಮ ಬೆಳೆ ಆರೈಕೆ ವೇಳಾಪಟ್ಟಿ ಸಿದ್ಧವಾಗಿದೆ.", mr: "तुमचे पीक नियोजन तयार आहे.", pa: "ਤੁਹਾਡੀ ਫਸਲ ਸਮਾਂ-ਸਾਰਣੀ ਤਿਆਰ ਹੈ।", bn: "আপনার ফসল পরিচর্যা সময়সূচী প্রস্তুত।", gu: "તમારી પાક સંભાળ સમયરેખા તૈયાર છે.", ml: "നിങ്ങളുടെ വിള പരിപാലന ഷെഡ്യൂൾ തയ്യാറാണ്." }
+  eyebrow: {
+    en: "New Crop Onboarding & Care Schedule",
+    te: "కొత్త పంట నమోదు & సంరక్షణ ప్రణాళిక",
+    hi: "नई फसल पंजीकरण व देखभाल योजना",
+    ta: "புதிய பயிர் பதிவு & பராமரிப்பு திட்டம்",
+    kn: "ಹೊಸ ಬೆಳೆ ನೋಂದಣಿ & ಆರೈಕೆ ಯೋಜನೆ",
+    mr: "नवीन पीक नोंदणी व काळजी योजना",
+    pa: "ਨਵੀਂ ਫਸਲ ਰਜਿਸਟ੍ਰੇਸ਼ਨ ਤੇ ਸੰਭਾਲ ਯੋਜਨਾ",
+    bn: "নতুন ফসল নিবন্ধন ও যত্ন পরিকল্পনা",
+    gu: "નવી પાક નોંધણી અને સંભાળ યોજના",
+    ml: "പുതിയ വിള രജിസ്ട്രേഷൻ & പരിചരണ പ്ലാൻ",
+  },
+  main_heading: {
+    en: "Register Crop Field & Generate Care Plan",
+    te: "పంట పొలాన్ని నమోదు చేసి సంరక్షణ ప్రణాళికను రూపొందించండి",
+    hi: "फसल खेत दर्ज करें और देखभाल योजना बनाएं",
+    ta: "பயிர் வயலைப் பதிவு செய்து பராமரிப்புத் திட்டத்தை உருவாக்கவும்",
+    kn: "ಬೆಳೆ ಜಮೀನು ನೋಂದಾಯಿಸಿ ಆರೈಕೆ ಯೋಜನೆ ರಚಿಸಿ",
+    mr: "पीक शेत नोंदवा आणि काळजी योजना तयार करा",
+    pa: "ਫਸਲ ਖੇਤ ਦਰਜ ਕਰੋ ਅਤੇ ਸੰਭਾਲ ਯੋਜਨਾ ਬਣਾਓ",
+    bn: "ফসলের জমি নিবন্ধন করুন এবং যত্ন পরিকল্পনা তৈরি করুন",
+    gu: "પાક ખેતર નોંધો અને સંભાળ યોજના બનાવો",
+    ml: "വിള കൃഷിയിടം രജിസ്റ്റർ ചെയ്ത് പരിചരണ പ്ലാൻ ഉണ്ടാക്കുക",
+  },
 };
 
-const processOptions = [
-  { key: "Ploughing", icon: Tractor },
+const processes = [
+  { key: "Ploughing", icon: Layers },
   { key: "Seeding", icon: Sprout },
   { key: "Irrigation", icon: Droplets },
   { key: "None yet", icon: Mountain },
+];
+
+const LAND_UNITS = [
+  { id: "acres", label: "Acres" },
+  { id: "hectares", label: "Hectares" },
+  { id: "guntas", label: "Guntas (AP/TS/KA)" },
+  { id: "cents", label: "Cents (AP/TN/KL)" },
+  { id: "bigha", label: "Bigha" },
 ];
 
 type CropForm = {
@@ -66,6 +90,7 @@ type CropForm = {
   state: string;
   district: string;
   landArea: string;
+  landUnit: string;
   startDate: string;
   cropCount: string;
   process: string;
@@ -73,20 +98,6 @@ type CropForm = {
   variety: string;
   season: string;
   notes: string;
-};
-
-const initialForm: CropForm = {
-  location: "Village A",
-  state: "Andhra Pradesh",
-  district: "Guntur",
-  landArea: "2.5",
-  startDate: "2026-08-14",
-  cropCount: "1",
-  process: "Seeding",
-  cropName: "",
-  variety: "",
-  season: "Kharif",
-  notes: "",
 };
 
 function Field({ label, icon, children, wide = false }: { label: string; icon: React.ReactNode; children: React.ReactNode; wide?: boolean }) {
@@ -102,11 +113,41 @@ function Field({ label, icon, children, wide = false }: { label: string; icon: R
 }
 
 export default function CropRegistration() {
+  const [, setLocation] = useLocation();
   const { language, t } = useLanguage();
+  const { location } = useLocationContext();
+
   const [step, setStep] = useState(0);
-  const [form, setForm] = useState<CropForm>(initialForm);
+  const [form, setForm] = useState<CropForm>({
+    location: location.villageCity || "Gowdapalem",
+    state: location.state || "Andhra Pradesh",
+    district: location.district || "Guntur",
+    landArea: "2.5",
+    landUnit: "acres",
+    startDate: new Date().toISOString().split("T")[0],
+    cropCount: "1",
+    process: "Seeding",
+    cropName: "Paddy",
+    variety: "BPT-5204 (Samba Mahsuri)",
+    season: "Kharif",
+    notes: "",
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [createdRegistration, setCreatedRegistration] = useState<any>(null);
+
+  // Sync village & district when GPS location updates
+  useEffect(() => {
+    if (location.villageCity) {
+      setForm((f) => ({
+        ...f,
+        location: f.location === "Gowdapalem" ? location.villageCity : f.location,
+        district: f.district === "Guntur" ? location.district : f.district,
+        state: f.state === "Andhra Pradesh" ? location.state : f.state,
+      }));
+    }
+  }, [location.villageCity, location.district, location.state]);
 
   const str = (key: keyof typeof REG_STRINGS): string => {
     return REG_STRINGS[key]?.[language] || REG_STRINGS[key]?.en || "";
@@ -114,18 +155,20 @@ export default function CropRegistration() {
 
   const stepsList = STEP_LABELS[language] || STEP_LABELS.en;
 
-  const setField = <K extends keyof CropForm>(key: K, value: CropForm[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const setField = <K extends keyof CropForm>(key: K, value: CropForm[K]) =>
+    setForm((current) => ({ ...current, [key]: value }));
 
   const next = async () => {
     if (step === 3) {
       setSubmitting(true);
       setError("");
       try {
-        await cropsApi.register({
+        const res = await cropsApi.register({
           location: form.location,
           state: form.state,
           district: form.district,
           landArea: form.landArea,
+          landUnit: form.landUnit,
           startDate: form.startDate,
           cropName: form.cropName || "Paddy",
           variety: form.variety,
@@ -133,23 +176,21 @@ export default function CropRegistration() {
           process: form.process,
           notes: form.notes,
         });
-        setStep(stepsList.length - 1);
 
-        // Dispatch proactive contextual nudge to AI Voice Assistant
-        try {
-          const proactiveEvent = new CustomEvent("agroscan:proactive-crop-registered", {
-            detail: {
-              cropName: form.cropName || "Crop",
-              variety: form.variety,
-              location: form.location,
-            },
-          });
-          window.dispatchEvent(proactiveEvent);
-        } catch (evtErr) {
-          console.warn("Could not dispatch proactive assistant event:", evtErr);
-        }
-      } catch (err) {
-        setError(getApiErrorMessage(err));
+        setCreatedRegistration({
+          ...res,
+          cropName: form.cropName || "Paddy",
+          variety: form.variety,
+          landArea: form.landArea,
+          landUnit: form.landUnit,
+          startDate: form.startDate,
+          season: form.season,
+          location: form.location,
+        });
+
+        setStep(4);
+      } catch (err: any) {
+        setError(err?.response?.data?.error || "Failed to register crop. Please check your inputs.");
       } finally {
         setSubmitting(false);
       }
@@ -157,225 +198,385 @@ export default function CropRegistration() {
     }
     setStep((current) => Math.min(stepsList.length - 1, current + 1));
   };
-  const back = () => setStep((current) => Math.max(0, current - 1));
+
+  const prev = () => setStep((current) => Math.max(0, current - 1));
 
   return (
-    <main className="workspace-page">
-      <header className="workspace-topbar">
-        <Link href="/dashboard" className="workspace-back">
+    <main className="workspace-page min-h-screen bg-[#f7f8f4] text-[#1c3827]">
+      <header className="workspace-topbar sticky top-0 z-40 bg-[#f7f8f4]/90 backdrop-blur border-b border-[#e1e6d7] px-6 py-4 flex items-center justify-between">
+        <Link href="/dashboard" className="workspace-back inline-flex items-center gap-2 text-sm font-bold text-[#2f6b45] no-underline hover:underline">
           <ArrowLeft size={17} /> <span>{t("back_to_dashboard")}</span>
         </Link>
-        <div className="workspace-brand">
-          <EditableFrame id="reg_crop_brand_mark" className="workspace-brand-mark">
-            <Leaf size={17} />
+        <div className="flex items-center gap-2 font-display text-lg font-bold text-[#20402e]">
+          <EditableFrame id="crop_reg_brand_mark" className="h-8 w-8 rounded-xl bg-[#2f6b45] text-white">
+            <Leaf size={18} />
           </EditableFrame>
           <span>AgroScan</span>
         </div>
-        <span className="workspace-top-context">{t("register_crop")} / 01</span>
+        <span className="hidden sm:inline-block text-xs font-extrabold uppercase tracking-wider text-[#456b52] bg-[#e5eddc] px-3 py-1 rounded-full">
+          Crop Registration Engine
+        </span>
       </header>
 
-      <div className="workspace-content crop-registration-content">
-        <div className="workspace-heading-row">
-          <div>
-            <EditableFrame id="reg_crop_heading" isTextOnly>
-              <p className="dashboard-kicker dashboard-kicker-dark">{str("eyebrow")}</p>
-              <h1 className="workspace-title">{str("title")}</h1>
-              <p className="workspace-lede">{str("lede")}</p>
-            </EditableFrame>
+      <div className="workspace-content max-w-5xl mx-auto px-4 py-8 space-y-8">
+        <EditableFrame id="crop_reg_heading_panel" isTextOnly>
+          <div className="space-y-1">
+            <p className="text-xs font-extrabold uppercase tracking-widest text-[#2f6b45]">
+              {str("eyebrow")}
+            </p>
+            <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#193625]">
+              {str("main_heading")}
+            </h1>
+            <p className="text-sm text-[#4d6957]">
+              Step-by-step agronomy wizard configured with local land measurement units and satellite GPS geolocation.
+            </p>
           </div>
-          <div className="workspace-heading-mark">
-            <Wheat size={27} />
-          </div>
-        </div>
+        </EditableFrame>
 
-        <nav className="registration-stepper" aria-label="Crop registration progress">
+        {/* Step Progress Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2">
           {stepsList.map((label, index) => (
             <div
-              className={`registration-step ${index === step ? "registration-step-current" : ""} ${index < step ? "registration-step-done" : ""}`}
-              key={label}
+              key={index}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold shrink-0 transition-all ${
+                index === step
+                  ? "bg-[#2f6b45] text-white shadow-md scale-105"
+                  : index < step
+                  ? "bg-[#e5eddc] text-[#2f6b45]"
+                  : "bg-white text-gray-400 border border-[#d8e2cf]"
+              }`}
             >
-              <span className="registration-step-circle">{index < step ? <Check size={14} /> : index + 1}</span>
+              <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
+                index === step ? "bg-white text-[#2f6b45]" : index < step ? "bg-[#2f6b45] text-white" : "bg-gray-100 text-gray-500"
+              }`}>
+                {index < step ? "✓" : index + 1}
+              </span>
               <span>{label}</span>
-              {index < stepsList.length - 1 && <span className="registration-step-line" aria-hidden="true" />}
             </div>
           ))}
-        </nav>
+        </div>
 
-        <div className="registration-layout">
-          <EditableFrame id="reg_crop_card_container" className="registration-card" defaultBgColor="#ffffff">
-            {step === 0 && (
-              <>
-                <div className="registration-card-heading">
-                  <div>
-                    <p className="dashboard-kicker dashboard-kicker-dark">{stepsList[0]}</p>
-                    <h2>Where is the crop growing?</h2>
-                    <p>Start with the place you know best: the field itself.</p>
-                  </div>
-                  <span className="registration-card-icon"><MapPin size={22} /></span>
-                </div>
-                <div className="workspace-form-grid">
-                  <Field label="Crop growing location" icon={<LocateFixed size={18} />} wide>
-                    <input aria-label="Crop growing location" value={form.location} onChange={(event) => setField("location", event.target.value)} placeholder="Village or city" />
-                  </Field>
-                  <Field label="Select state" icon={<MapPin size={18} />}>
-                    <select aria-label="Select state" value={form.state} onChange={(event) => setField("state", event.target.value)}>
-                      <option>Andhra Pradesh</option>
-                      <option>Telangana</option>
-                      <option>Karnataka</option>
-                      <option>Maharashtra</option>
-                      <option>Tamil Nadu</option>
-                      <option>Punjab</option>
-                    </select>
-                    <ChevronDown className="workspace-select-chevron" size={16} />
-                  </Field>
-                  <Field label="Select district" icon={<MapPin size={18} />}>
-                    <select aria-label="Select district" value={form.district} onChange={(event) => setField("district", event.target.value)}>
-                      <option>Guntur</option>
-                      <option>Krishna</option>
-                      <option>Warangal</option>
-                      <option>Nashik</option>
-                      <option>Thanjavur</option>
-                      <option>Ludhiana</option>
-                    </select>
-                    <ChevronDown className="workspace-select-chevron" size={16} />
-                  </Field>
-                  <Field label="Land area in acres" icon={<Mountain size={18} />}>
-                    <input aria-label="Land area in acres" type="number" min="0" step="0.1" value={form.landArea} onChange={(event) => setField("landArea", event.target.value)} />
-                  </Field>
-                  <Field label="Date crop started" icon={<CalendarDays size={18} />}>
-                    <input aria-label="Date crop started" type="date" value={form.startDate} onChange={(event) => setField("startDate", event.target.value)} />
-                  </Field>
-                  <Field label="Number of crops" icon={<Wheat size={18} />}>
-                    <select aria-label="Number of crops" value={form.cropCount} onChange={(event) => setField("cropCount", event.target.value)}>
-                      <option value="1">1 crop</option>
-                      <option value="2">2 crops</option>
-                      <option value="3">3 crops</option>
-                      <option value="4">4+ crops</option>
-                    </select>
-                    <ChevronDown className="workspace-select-chevron" size={16} />
-                  </Field>
-                </div>
-                <div className="registration-process">
-                  <label>Process started, if any</label>
-                  <div className="process-chip-grid">
-                    {processOptions.map(({ key, icon: Icon }) => (
-                      <button
-                        type="button"
-                        className={`process-chip ${form.process === key ? "process-chip-active" : ""}`}
-                        key={key}
-                        onClick={() => setField("process", key)}
-                      >
-                        <Icon size={17} />{PROCESS_TRANSLATIONS[key]?.[language] || key}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+        {/* Form Card */}
+        <EditableFrame id="crop_reg_wizard_card" className="rounded-3xl border border-[#d8e0cc] bg-white p-6 sm:p-10 shadow-xl">
+          {/* Step 0: Basic Field Info with GPS Auto-fill and Flexible Land Units */}
+          {step === 0 && (
+            <div className="space-y-6">
+              <h3 className="font-display text-xl font-bold text-[#183624]">Field Geolocation &amp; Land Size</h3>
 
-            {step === 1 && (
-              <div className="registration-simple-step">
-                <p className="dashboard-kicker dashboard-kicker-dark">{stepsList[1]}</p>
-                <h2>What are you growing?</h2>
-                <p>Use the name you use in the field. You can add more detail later.</p>
-                <div className="workspace-form-grid workspace-form-grid-single">
-                  <Field label="Crop name" icon={<Leaf size={18} />} wide>
-                    <input aria-label="Crop name" value={form.cropName} onChange={(event) => setField("cropName", event.target.value)} placeholder="e.g. Paddy, Maize, Tomato, Cotton, Chilli" />
-                  </Field>
-                  <Field label="Variety (optional)" icon={<Sprout size={18} />} wide>
-                    <input aria-label="Crop variety" value={form.variety} onChange={(event) => setField("variety", event.target.value)} placeholder="e.g. BPT 5204, US 312, Hybrid 65" />
-                  </Field>
-                  <Field label="Growing season" icon={<CalendarDays size={18} />} wide>
-                    <select aria-label="Growing season" value={form.season} onChange={(event) => setField("season", event.target.value)}>
-                      <option value="Kharif">Kharif (Monsoon)</option>
-                      <option value="Rabi">Rabi (Winter)</option>
-                      <option value="Summer">Summer (Zaid)</option>
-                      <option value="Year-round">Year-round</option>
-                    </select>
-                    <ChevronDown className="workspace-select-chevron" size={16} />
-                  </Field>
-                </div>
-              </div>
-            )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Village / Growing Location *" icon={<MapPin size={16} />}>
+                  <input
+                    type="text"
+                    value={form.location}
+                    onChange={(e) => setField("location", e.target.value)}
+                    placeholder="e.g. Gowdapalem"
+                    required
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none"
+                  />
+                </Field>
 
-            {step === 2 && (
-              <div className="registration-simple-step">
-                <p className="dashboard-kicker dashboard-kicker-dark">{stepsList[2]}</p>
-                <h2>What is happening in the field?</h2>
-                <p>Choose the activity you’re working through now. This keeps your plan in step with the season.</p>
-                <div className="process-detail-grid">
-                  {processOptions.map(({ key, icon: Icon }) => (
-                    <button
-                      type="button"
-                      className={`process-detail-card ${form.process === key ? "process-detail-card-active" : ""}`}
-                      key={key}
-                      onClick={() => setField("process", key)}
-                    >
-                      <span className="process-detail-icon"><Icon size={23} /></span>
-                      <strong>{PROCESS_TRANSLATIONS[key]?.[language] || key}</strong>
-                      <span>{form.process === key ? "Selected for your plan" : "Add this to the field note"}</span>
-                    </button>
-                  ))}
-                </div>
-                <Field label="A note for later (optional)" icon={<CircleHelp size={18} />} wide>
-                  <textarea aria-label="A note for later" value={form.notes} onChange={(event) => setField("notes", event.target.value)} placeholder="Anything you want AgroScan to remember?" rows={4} />
+                <Field label="District *" icon={<MapPin size={16} />}>
+                  <input
+                    type="text"
+                    value={form.district}
+                    onChange={(e) => setField("district", e.target.value)}
+                    placeholder="e.g. Guntur"
+                    required
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none"
+                  />
                 </Field>
               </div>
-            )}
 
-            {step === 3 && (
-              <div className="registration-simple-step">
-                <p className="dashboard-kicker dashboard-kicker-dark">{stepsList[3]}</p>
-                <h2>Check the field note.</h2>
-                <p>Make sure the basics look right before we create your proactive crop plan.</p>
-                <div className="review-grid">
-                  <div><span>Location</span><strong>{form.location}, {form.district}</strong></div>
-                  <div><span>Land area</span><strong>{form.landArea || "—"} acres</strong></div>
-                  <div><span>Started</span><strong>{form.startDate || "—"}</strong></div>
-                  <div><span>Crop</span><strong>{form.cropName ? localizeCrop(form.cropName, language) : "Paddy"}</strong></div>
-                  <div><span>Process</span><strong>{PROCESS_TRANSLATIONS[form.process]?.[language] || form.process}</strong></div>
-                  <div><span>Season</span><strong>{form.season}</strong></div>
-                </div>
-                <div className="review-note">
-                  <ShieldCheck size={15} /> Your crop care schedule and preventive alerts will be generated automatically.
+              {/* Land Area + Land Unit Selector */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Land Area Size *" icon={<Layers size={16} />}>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={form.landArea}
+                    onChange={(e) => setField("landArea", e.target.value)}
+                    placeholder="e.g. 2.5"
+                    required
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none"
+                  />
+                </Field>
+
+                <Field label="Land Measurement Unit *" icon={<Layers size={16} />}>
+                  <select
+                    value={form.landUnit}
+                    onChange={(e) => setField("landUnit", e.target.value)}
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none cursor-pointer"
+                  >
+                    {LAND_UNITS.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              {/* Exact Date Picker */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Date Crop Started / Sowing Date *" icon={<Calendar size={16} />}>
+                  <input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => setField("startDate", e.target.value)}
+                    required
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none cursor-pointer"
+                  />
+                </Field>
+
+                <Field label="State *" icon={<MapPin size={16} />}>
+                  <input
+                    type="text"
+                    value={form.state}
+                    onChange={(e) => setField("state", e.target.value)}
+                    required
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none"
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {/* Step 1: Select Crop & Season */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <h3 className="font-display text-xl font-bold text-[#183624]">Select Crop &amp; Season</h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Target Crop *" icon={<Sprout size={16} />}>
+                  <select
+                    value={form.cropName}
+                    onChange={(e) => setField("cropName", e.target.value)}
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none cursor-pointer"
+                  >
+                    {CROPS_DATABASE.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {localizeCrop(c.name, language)} ({c.category})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Crop Variety / Cultivar" icon={<Wheat size={16} />}>
+                  <input
+                    type="text"
+                    value={form.variety}
+                    onChange={(e) => setField("variety", e.target.value)}
+                    placeholder="e.g. BPT-5204, MTU-1010, Hybrid 6444"
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none"
+                  />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Agricultural Season *" icon={<Calendar size={16} />}>
+                  <select
+                    value={form.season}
+                    onChange={(e) => setField("season", e.target.value)}
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none cursor-pointer"
+                  >
+                    <option value="Kharif">Kharif (Monsoon / June - Oct)</option>
+                    <option value="Rabi">Rabi (Winter / Nov - March)</option>
+                    <option value="Zaid / Summer">Zaid / Summer (March - June)</option>
+                    <option value="Annual / Perennial">Annual / Perennial</option>
+                  </select>
+                </Field>
+
+                <Field label="Field Notes (Optional)" icon={<Leaf size={16} />}>
+                  <input
+                    type="text"
+                    value={form.notes}
+                    onChange={(e) => setField("notes", e.target.value)}
+                    placeholder="e.g. Drip irrigated, clay loam soil"
+                    className="w-full bg-transparent px-3 py-2 text-xs font-bold text-[#1b3b27] focus:outline-none"
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Farming Stage */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <h3 className="font-display text-xl font-bold text-[#183624]">Current Farming Stage</h3>
+              <p className="text-xs text-[#52705d]">Select which stage your field is currently in so we can sequence your care tasks properly.</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {processes.map((proc) => {
+                  const Icon = proc.icon;
+                  const isSelected = form.process === proc.key;
+                  return (
+                    <button
+                      key={proc.key}
+                      type="button"
+                      onClick={() => setField("process", proc.key)}
+                      className={`flex items-center gap-4 rounded-2xl border p-5 text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-[#2f6b45] bg-[#edf4e8] shadow-md scale-102"
+                          : "border-[#d8e2cf] bg-[#fafcf7] hover:bg-[#f2f7ec]"
+                      }`}
+                    >
+                      <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+                        isSelected ? "bg-[#2f6b45] text-white" : "bg-[#e5eddc] text-[#2f6b45]"
+                      }`}>
+                        <Icon size={22} />
+                      </span>
+                      <div>
+                        <h4 className="font-display text-sm font-bold text-[#183624]">{proc.key}</h4>
+                        <p className="text-xs text-[#52705d] mt-0.5">
+                          {proc.key === "Ploughing" && "Land prep, harrowing & basal manure application"}
+                          {proc.key === "Seeding" && "Nursery transplanting or direct seed drilling"}
+                          {proc.key === "Irrigation" && "Active vegetative growth & early nutrition"}
+                          {proc.key === "None yet" && "Planning phase before physical fieldwork"}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Review & Submit */}
+          {step === 3 && (
+            <div className="space-y-6">
+              <h3 className="font-display text-xl font-bold text-[#183624]">Review Crop Plan Summary</h3>
+
+              <div className="rounded-2xl bg-[#fafcf7] border border-[#dce5d2] p-6 space-y-4 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <div>
+                    <span className="text-[#567560] font-semibold block">Crop:</span>
+                    <strong className="text-sm font-bold text-[#183624]">{form.cropName} ({form.variety || "Standard"})</strong>
+                  </div>
+                  <div>
+                    <span className="text-[#567560] font-semibold block">Land Area:</span>
+                    <strong className="text-sm font-bold text-[#183624]">{form.landArea} {form.landUnit}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[#567560] font-semibold block">Sowing Date:</span>
+                    <strong className="text-sm font-bold text-[#183624]">{form.startDate}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[#567560] font-semibold block">Growing Village:</span>
+                    <strong className="text-sm font-bold text-[#183624]">{form.location}, {form.district}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[#567560] font-semibold block">Season:</span>
+                    <strong className="text-sm font-bold text-[#183624]">{form.season}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[#567560] font-semibold block">Current Stage:</span>
+                    <strong className="text-sm font-bold text-[#183624]">{form.process}</strong>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {step === 4 && (
-              <div className="registration-complete">
-                <span className="complete-icon"><Check size={28} /></span>
-                <p className="dashboard-kicker dashboard-kicker-dark">{stepsList[4]}</p>
-                <h2>{str("ready_msg")}</h2>
-                <p>We’ve generated a stage-by-stage care timeline with proactive risk alerts for {form.cropName ? localizeCrop(form.cropName, language) : "your field"} in {form.location}.</p>
-                <Link href="/my-crops" className="workspace-primary-button">
-                  {str("view_plan")} <ArrowRight size={17} />
+              {error && (
+                <div className="rounded-xl bg-rose-50 border border-rose-300 p-3 text-xs text-rose-800 font-semibold">
+                  {error}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 4: Plan Created (Fix 404 & Rich Summary View) */}
+          {step === 4 && (
+            <div className="space-y-6 text-center animate-in zoom-in-95 duration-200">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#e5eddc] text-[#2f6b45] mx-auto shadow-md">
+                <CheckCircle2 size={36} />
+              </div>
+
+              <div className="space-y-1">
+                <span className="rounded-full bg-emerald-100 text-emerald-800 px-3 py-0.5 text-xs font-extrabold uppercase">
+                  Care Schedule Generated Successfully
+                </span>
+                <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#183624]">
+                  {form.cropName} Care Plan is Active!
+                </h3>
+                <p className="text-xs text-[#52705d] max-w-md mx-auto">
+                  Stage-by-stage tasks, automated pest risk windows, and weather SMS alerts are now active for your {form.landArea} {form.landUnit} field in {form.location}.
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-[#fafcf7] border border-[#dce5d2] p-5 max-w-lg mx-auto text-xs text-left space-y-2">
+                <div className="flex justify-between border-b border-[#e5edd8] pb-2">
+                  <span className="text-[#567560]">Crop &amp; Variety:</span>
+                  <strong className="text-[#183624]">{form.cropName} {form.variety ? `(${form.variety})` : ""}</strong>
+                </div>
+                <div className="flex justify-between border-b border-[#e5edd8] pb-2">
+                  <span className="text-[#567560]">Land Size:</span>
+                  <strong className="text-[#183624]">{form.landArea} {form.landUnit}</strong>
+                </div>
+                <div className="flex justify-between border-b border-[#e5edd8] pb-2">
+                  <span className="text-[#567560]">Start / Sowing Date:</span>
+                  <strong className="text-[#183624]">{form.startDate}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#567560]">Location:</span>
+                  <strong className="text-[#183624]">{form.location}, {form.district}</strong>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-center gap-3 pt-2">
+                <Link
+                  href="/my-crops"
+                  className="rounded-2xl bg-[#2f6b45] px-8 py-3.5 text-xs font-bold text-white shadow-xl hover:bg-[#20492f] no-underline flex items-center justify-center gap-2"
+                >
+                  <span>Open My Crops &amp; Care Schedule</span> <ArrowRight size={15} />
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="rounded-2xl border border-[#cbd8bf] bg-white px-6 py-3.5 text-xs font-bold text-[#1b3b27] hover:bg-[#f3f7ee] no-underline flex items-center justify-center"
+                >
+                  Return to Dashboard
                 </Link>
               </div>
-            )}
+            </div>
+          )}
 
-            {step < 4 && (
-              <div className="registration-actions">
-                <button type="button" className="workspace-secondary-button cursor-pointer" onClick={back} disabled={step === 0}>
-                  {str("back")}
+          {/* Action Buttons for Step 0-3 */}
+          {step < 4 && (
+            <div className="mt-8 pt-6 border-t border-[#e5eddc] flex items-center justify-between">
+              {step > 0 ? (
+                <button
+                  type="button"
+                  onClick={prev}
+                  className="rounded-2xl border border-[#cbd8bf] bg-white px-5 py-2.5 text-xs font-bold text-[#1b3b27] hover:bg-[#f3f7ee] cursor-pointer"
+                >
+                  ← Previous Step
                 </button>
-                <button type="button" className="workspace-primary-button cursor-pointer" onClick={next} disabled={submitting}>
-                  {submitting ? str("creating") : step === 3 ? str("create_plan") : str("next")} <ArrowRight size={17} />
-                </button>
-              </div>
-            )}
-            {error && <p className="auth-error">{error}</p>}
-          </EditableFrame>
+              ) : (
+                <div />
+              )}
 
-          <aside className="registration-tip">
-            <span className="tip-kicker">Field tip / 01</span>
-            <span className="tip-illustration"><Leaf size={36} /></span>
-            <h2>Start with what you know.</h2>
-            <p>A location and a crop stage are enough to begin a proactive care plan with risk alerts.</p>
-            <div className="tip-check"><Check size={14} /> Auto-generates preventive alerts</div>
-            <div className="tip-check"><Check size={14} /> Saved to your account</div>
-          </aside>
-        </div>
+              <button
+                type="button"
+                onClick={next}
+                disabled={submitting}
+                className="rounded-2xl bg-[#2f6b45] px-7 py-3 text-xs font-bold text-white shadow-lg hover:bg-[#20492f] disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-all"
+              >
+                {submitting ? (
+                  <>
+                    <LoaderCircle size={16} className="animate-spin" /> Creating Care Schedule…
+                  </>
+                ) : step === 3 ? (
+                  <>
+                    Create Crop Plan &amp; Alerts <Sparkles size={15} />
+                  </>
+                ) : (
+                  <>
+                    Continue <ArrowRight size={15} />
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </EditableFrame>
       </div>
     </main>
   );
