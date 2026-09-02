@@ -3,6 +3,28 @@ import { query } from "../db.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sendSMS } from "../services/smsService.js";
 
+export function normalizeLandArea(rawArea: number, unit?: string): { acres: number; unit: string } {
+  const u = (unit || "acres").toLowerCase().trim();
+  switch (u) {
+    case "hectares":
+    case "hectare":
+      return { acres: Number((rawArea * 2.47105).toFixed(2)), unit: "hectares" };
+    case "guntas":
+    case "gunta":
+      return { acres: Number((rawArea * 0.025).toFixed(2)), unit: "guntas" };
+    case "cents":
+    case "cent":
+      return { acres: Number((rawArea * 0.01).toFixed(2)), unit: "cents" };
+    case "bigha":
+    case "bighas":
+      return { acres: Number((rawArea * 0.625).toFixed(2)), unit: "bigha" };
+    case "acres":
+    case "acre":
+    default:
+      return { acres: Number(rawArea.toFixed(2)), unit: "acres" };
+  }
+}
+
 const router = Router();
 
 const processToStage: Record<string, string> = {

@@ -295,15 +295,16 @@ export default function HelpDesk() {
         crop_disease: "Field Crop Disease / Soil Health Escalation",
       };
 
-      const res = await supportApi.referToGovt({
+      const res = await supportApi.createAgronomistReferral({
         cropName: govCrop || "Field Crop",
-        issueDescription: govProblem.trim(),
-        farmerNotes: categoryTitles[govCategory] || "Government Extension Request",
-        location: `${location.villageCity || "Gowdapalem"}, ${location.district || "Guntur"}`,
+        problemDescription: `${categoryTitles[govCategory]}: ${govProblem.trim()}`,
+        villageCity: location.villageCity || "Gowdapalem",
+        district: location.district || "Guntur",
+        state: location.state || "Andhra Pradesh",
       });
 
       setGovReferralReceipt({
-        ...res,
+        referralNumber: res.referralDetails.referenceNumber,
         category: categoryTitles[govCategory],
         cropName: govCrop,
         description: govProblem,

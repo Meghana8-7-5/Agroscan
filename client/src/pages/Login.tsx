@@ -31,7 +31,7 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { login, sendOtp, verifyOtp, completeProfile } = useAuth();
   const { loginAdmin, getCustomization } = useUiEditContext();
-  const { language, setLanguage, allLanguages } = useLanguage();
+  const { language, setLanguage, languages } = useLanguage();
   const { location } = useLocationContext();
 
   const [activeTab, setActiveTab] = useState<"farmer" | "admin">(() => {
@@ -503,7 +503,7 @@ export default function Login() {
                           onChange={(e) => setProfileLang(e.target.value)}
                           className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-10 pr-4 py-3 text-xs font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 cursor-pointer"
                         >
-                          {allLanguages.map((l) => (
+                          {languages.map((l) => (
                             <option key={l.code} value={l.code}>
                               {l.nativeName} ({l.name})
                             </option>

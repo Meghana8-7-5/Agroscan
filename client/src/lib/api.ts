@@ -83,13 +83,25 @@ export type ApiNotification = {
 
 export type DetectionResult = {
   id: string;
-  disease: string;
-  crop: string;
+  verdict?: "Healthy" | "Disease detected" | "Pest detected" | "Uncertain" | string;
+  verdictHeadline?: string;
+  verdictSummary?: string;
+  diseaseName?: string | null;
+  cropName?: string;
+  disease?: string;
+  crop?: string;
   confidence: number;
-  severity: "Low" | "Moderate" | "High";
-  organic: string[];
-  chemical: string[];
-  preventive: string[];
+  severity: "None" | "Low" | "Moderate" | "High" | string;
+  symptomsObserved?: string;
+  rootCause?: string;
+  organicTreatment?: string[];
+  chemicalTreatment?: string[];
+  preventiveMeasures?: string[];
+  organic?: string[];
+  chemical?: string[];
+  preventive?: string[];
+  scannedAt?: string;
+  imageUrl?: string;
 };
 
 export type RecentDetection = {
@@ -201,10 +213,13 @@ export const notificationsApi = {
 };
 
 export const detectionsApi = {
-  analyze: (imageDataUrl?: string, cropRegistrationId?: string) =>
-    api
-      .post<DetectionResult>("/detections/analyze", { imageDataUrl, cropRegistrationId })
-      .then((r) => r.data),
+  analyze: (payload?: string | { imageDataUrl?: string; cropRegistrationId?: string }, cropRegistrationId?: string) => {
+    const body =
+      typeof payload === "string"
+        ? { imageDataUrl: payload, cropRegistrationId }
+        : payload || {};
+    return api.post<DetectionResult>("/detections/analyze", body).then((r) => r.data);
+  },
   recent: () => api.get<RecentDetection[]>("/detections/recent").then((r) => r.data),
 };
 
@@ -222,6 +237,13 @@ export const uiConfigApi = {
 };
 
 export const aiAssistantApi = {
+  ask: (data: {
+    message: string;
+    language?: string;
+    farmerName?: string;
+    crops?: string[];
+    location?: string;
+  }) => api.post<{ answer: string; detectedLanguage: string; timestamp: string }>("/ai/ask", data).then((r) => r.data),
   chat: (data: {
     message: string;
     language?: string;

@@ -127,7 +127,7 @@ const WEATHER_STRINGS: Record<string, Record<string, string>> = {
 
 export default function WeatherAnalysis() {
   const { language, t } = useLanguage();
-  const { location, refreshLocation, isLocating } = useLocationContext();
+  const { location, requestGpsLocation, isGeocoding } = useLocationContext();
 
   const [weatherData, setWeatherData] = useState<LiveWeatherState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -165,8 +165,9 @@ export default function WeatherAnalysis() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refreshLocation();
+    requestGpsLocation();
     await fetchLiveWeather();
+    setRefreshing(false);
   };
 
   return (
@@ -185,10 +186,10 @@ export default function WeatherAnalysis() {
         <button
           type="button"
           onClick={handleRefresh}
-          disabled={refreshing || isLocating}
+          disabled={refreshing || isGeocoding}
           className="rounded-full bg-white border border-[#cbd8bf] px-4 py-1.5 text-xs font-bold text-[#2f6b45] hover:bg-[#eef4e7] flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
         >
-          <RefreshCw size={13} className={refreshing || isLocating ? "animate-spin" : ""} />
+          <RefreshCw size={13} className={refreshing || isGeocoding ? "animate-spin" : ""} />
           <span>{str("refresh_location_btn")}</span>
         </button>
       </header>

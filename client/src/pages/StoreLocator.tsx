@@ -75,7 +75,7 @@ const STORE_PAGE_STRINGS: Record<string, Record<string, string>> = {
 };
 
 export default function StoreLocator() {
-  const { location, requestGpsLocation, refreshLocation, isLocating } = useLocationContext();
+  const { location, requestGpsLocation, isGeocoding } = useLocationContext();
   const { language, t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [stores, setStores] = useState<AgriStoreItem[]>([]);
@@ -131,18 +131,18 @@ export default function StoreLocator() {
           <EditableFrame id="store_header_icon" className="h-8 w-8 rounded-xl bg-[#2f6b45] text-white">
             <Store size={18} />
           </EditableFrame>
-          <span>{t("store_locator")}</span>
+          <span>{t("stores_near_me")}</span>
         </div>
         <button
           type="button"
           onClick={() => {
-            refreshLocation();
+            requestGpsLocation();
             fetchNearbyStores();
           }}
-          disabled={isLocating}
+          disabled={isGeocoding}
           className="rounded-full bg-white border border-[#cbd8bf] px-4 py-1.5 text-xs font-bold text-[#2f6b45] hover:bg-[#eef4e7] flex items-center gap-1.5 shadow-sm cursor-pointer"
         >
-          <RefreshCw size={13} className={isLocating ? "animate-spin" : ""} />
+          <RefreshCw size={13} className={isGeocoding ? "animate-spin" : ""} />
           <span>Update GPS</span>
         </button>
       </header>
