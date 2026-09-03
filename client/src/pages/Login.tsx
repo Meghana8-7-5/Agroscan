@@ -207,29 +207,29 @@ export default function Login() {
       <EditableFrame
         id="login_hero_panel"
         isHeroPanel
-        className="auth-visual md:w-1/2 min-h-[300px] md:min-h-screen"
+        className="auth-visual md:w-1/2 min-h-[380px] md:min-h-screen p-8 sm:p-12 lg:p-16 flex flex-col justify-between"
         style={{
           backgroundImage: `linear-gradient(180deg, rgba(20,48,30,${overlayDarkness * 0.25}) 15%, rgba(20,48,30,${overlayDarkness}) 100%), url(${heroBgImage})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
-        <Link href="/" className="auth-brand" aria-label="Back to AgroScan home">
-          <EditableFrame id="login_brand_mark" className="auth-brand-mark">
-            <Leaf size={21} />
+        <Link href="/" className="auth-brand inline-flex items-center gap-2.5 text-white font-display text-2xl font-bold no-underline" aria-label="Back to AgroScan home">
+          <EditableFrame id="login_brand_mark" className="auth-brand-mark h-10 w-10 rounded-xl bg-[#2f6b45] text-white flex items-center justify-center shadow-lg">
+            <Leaf size={22} />
           </EditableFrame>
           <span>AgroScan</span>
         </Link>
 
-        <div className="auth-visual-copy">
+        <div className="auth-visual-copy space-y-4 my-auto py-8">
           <EditableFrame id="login_index_kicker" isTextOnly>
-            <p className="auth-visual-index">
+            <p className="auth-visual-index text-xs font-extrabold uppercase tracking-widest text-emerald-300">
               {getCustomization("login_index_kicker")?.title || (activeTab === "admin" ? "02 / ADMIN OPERATIONS DESK" : "02 / INSTANT FARMER MOBILE ACCESS")}
             </p>
           </EditableFrame>
 
           <EditableFrame id="login_headline" isTextOnly>
-            <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight text-white">
+            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.08] text-white tracking-tight">
               {headlineCustom?.title || (
                 activeTab === "admin" ? (
                   <>
@@ -247,7 +247,7 @@ export default function Login() {
           </EditableFrame>
 
           <EditableFrame id="login_subtext" isTextOnly>
-            <p className="text-sm text-emerald-100 max-w-md mt-3 leading-relaxed">
+            <p className="text-base text-emerald-100 max-w-lg mt-4 leading-relaxed">
               {subtextCustom?.subtitle || (
                 activeTab === "admin"
                   ? "Access administrative controls, review incoming farmer complaints, manage crop care advisories, and track Gram Sachivalayam agronomist referrals."
@@ -256,25 +256,25 @@ export default function Login() {
             </p>
           </EditableFrame>
 
-          <div className="auth-visual-foot text-xs text-emerald-200 mt-6 flex items-center gap-2">
+          <div className="auth-visual-foot text-sm text-emerald-200 mt-6 flex items-center gap-2.5 font-medium">
             {activeTab === "admin" ? (
-              <><ShieldAlert size={17} className="text-amber-400" /> Verified Agronomic Control Center</>
+              <><ShieldAlert size={19} className="text-amber-400 shrink-0" /> Verified Agronomic Control Center</>
             ) : (
-              <><ShieldCheck size={17} className="text-emerald-400" /> Safe &amp; verified mobile OTP login</>
+              <><ShieldCheck size={19} className="text-emerald-400 shrink-0" /> Safe &amp; verified mobile OTP login</>
             )}
           </div>
         </div>
       </EditableFrame>
 
       {/* Right Login / OTP Form Panel */}
-      <EditableFrame id="login_form_panel" className="auth-form-panel md:w-1/2 flex items-center justify-center p-6 sm:p-10" defaultBgColor="#fdfcf8">
-        <div className="auth-form-inner auth-form-inner-login max-w-md w-full space-y-6">
+      <EditableFrame id="login_form_panel" className="auth-form-panel md:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-16" defaultBgColor="#fdfcf8">
+        <div className="auth-form-inner auth-form-inner-login max-w-lg w-full space-y-7">
           <div className="auth-form-topline flex items-center justify-between">
-            <Link href="/get-started" className="auth-back-link text-xs font-bold text-[#2f6b45] flex items-center gap-1 hover:underline">
-              <ArrowLeft size={15} /> Back to role select
+            <Link href="/get-started" className="auth-back-link text-sm font-bold text-[#2f6b45] flex items-center gap-1.5 hover:underline">
+              <ArrowLeft size={16} /> Back to role select
             </Link>
             <div className="flex items-center gap-1.5">
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase ${
+              <span className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wide ${
                 activeTab === "admin" ? "bg-amber-200 text-amber-900 border border-amber-300" : "bg-emerald-100 text-emerald-800 border border-emerald-200"
               }`}>
                 {activeTab === "admin" ? "Admin Access" : "Farmer OTP Flow"}
@@ -283,20 +283,20 @@ export default function Login() {
           </div>
 
           {/* Role Tab Selector (Farmer vs Admin) */}
-          <div className="flex rounded-2xl bg-[#e8eedd] p-1 border border-[#d2dcb3]">
+          <div className="flex rounded-2xl bg-[#e8eedd] p-1.5 border border-[#d2dcb3]">
             <button
               type="button"
               onClick={() => {
                 setActiveTab("farmer");
                 setErrors({});
               }}
-              className={`flex-1 py-2 text-xs font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 activeTab === "farmer"
                   ? "bg-[#2f6b45] text-white shadow"
                   : "text-[#34543e] hover:text-[#183624]"
               }`}
             >
-              <Phone size={14} /> Farmer (Mobile + OTP)
+              <Phone size={15} /> Farmer (Mobile + OTP)
             </button>
             <button
               type="button"
@@ -304,13 +304,13 @@ export default function Login() {
                 setActiveTab("admin");
                 setErrors({});
               }}
-              className={`flex-1 py-2 text-xs font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              className={`flex-1 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 activeTab === "admin"
                   ? "bg-amber-600 text-white shadow"
                   : "text-[#34543e] hover:text-[#183624]"
               }`}
             >
-              <ShieldAlert size={14} /> Admin Login
+              <ShieldAlert size={15} /> Admin Login
             </button>
           </div>
 
@@ -321,23 +321,23 @@ export default function Login() {
             <div className="space-y-6">
               {/* Step 1: Enter Mobile Number */}
               {otpStep === "enter_mobile" && (
-                <form onSubmit={handleRequestOtp} className="space-y-4">
-                  <div className="auth-heading space-y-1">
+                <form onSubmit={handleRequestOtp} className="space-y-5">
+                  <div className="auth-heading space-y-1.5">
                     <p className="text-xs font-extrabold uppercase tracking-widest text-[#2f6b45]">
                       Farmer Direct Login
                     </p>
-                    <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#183624]">
+                    <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-[#183624] tracking-tight">
                       Enter your mobile number
                     </h2>
-                    <p className="text-xs text-[#52705d]">
+                    <p className="text-sm text-[#52705d] leading-relaxed">
                       We'll send a 6-digit verification code via SMS. Works for both new and returning farmers.
                     </p>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-[#193625]">Mobile Number</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-bold text-[#193625]">Mobile Number</label>
                     <div className="relative flex items-center">
-                      <span className="absolute left-3.5 text-xs font-extrabold text-[#2f6b45] bg-[#e5eddc] px-2 py-1 rounded-lg border border-[#c9d8bf]">
+                      <span className="absolute left-3.5 text-sm font-extrabold text-[#2f6b45] bg-[#e5eddc] px-2.5 py-1.5 rounded-xl border border-[#c9d8bf]">
                         🇮🇳 +91
                       </span>
                       <input
@@ -350,7 +350,7 @@ export default function Login() {
                         placeholder="98765 43210"
                         maxLength={15}
                         autoFocus
-                        className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-20 pr-4 py-3.5 text-sm font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 shadow-sm"
+                        className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-24 pr-4 py-4 text-base font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 shadow-sm"
                       />
                     </div>
                     {errors.mobile && <p className="text-xs text-rose-600 font-semibold mt-1">{errors.mobile}</p>}
@@ -359,15 +359,15 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={submitting || !mobileNumber.trim()}
-                    className="w-full rounded-2xl bg-[#2f6b45] py-3.5 text-xs font-bold text-white shadow-lg hover:bg-[#20492f] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer transition-all"
+                    className="w-full rounded-2xl bg-[#2f6b45] py-4 text-sm font-extrabold text-white shadow-xl hover:bg-[#20492f] disabled:opacity-50 flex items-center justify-center gap-2.5 cursor-pointer transition-all"
                   >
                     {submitting ? (
                       <>
-                        <LoaderCircle size={16} className="animate-spin" /> Sending SMS OTP…
+                        <LoaderCircle size={17} className="animate-spin" /> Sending SMS OTP…
                       </>
                     ) : (
                       <>
-                        Get Verification OTP <ArrowRight size={15} />
+                        Get Verification OTP <ArrowRight size={17} />
                       </>
                     )}
                   </button>
@@ -377,15 +377,15 @@ export default function Login() {
 
               {/* Step 2: Enter & Verify OTP */}
               {otpStep === "enter_otp" && (
-                <form onSubmit={handleVerifyOtp} className="space-y-4 animate-in fade-in">
-                  <div className="auth-heading space-y-1">
+                <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in">
+                  <div className="auth-heading space-y-1.5">
                     <p className="text-xs font-extrabold uppercase tracking-widest text-[#2f6b45]">
                       Verification Code Sent
                     </p>
-                    <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#183624]">
+                    <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-[#183624] tracking-tight">
                       Enter 6-digit OTP
                     </h2>
-                    <p className="text-xs text-[#52705d]">
+                    <p className="text-sm text-[#52705d] leading-relaxed">
                       Sent via SMS to <strong>+91 {mobileNumber}</strong>.{" "}
                       <button
                         type="button"
@@ -393,7 +393,7 @@ export default function Login() {
                           setOtpStep("enter_mobile");
                           setErrors({});
                         }}
-                        className="text-[#2f6b45] font-bold underline cursor-pointer"
+                        className="text-[#2f6b45] font-bold underline cursor-pointer hover:text-[#1b4229]"
                       >
                         Change number
                       </button>
@@ -401,20 +401,20 @@ export default function Login() {
                   </div>
 
                   {devOtpHint && (
-                    <div className="rounded-xl bg-emerald-50 border border-emerald-300 p-2.5 text-xs text-emerald-900 flex items-center justify-between">
+                    <div className="rounded-2xl bg-emerald-50 border border-emerald-300 p-3.5 text-sm text-emerald-900 flex items-center justify-between">
                       <span>SMS Sent! Code: <strong>{devOtpHint}</strong></span>
                       <button
                         type="button"
                         onClick={() => setOtpCode(devOtpHint)}
-                        className="font-bold underline text-emerald-800 cursor-pointer"
+                        className="font-bold underline text-emerald-800 cursor-pointer hover:text-emerald-950"
                       >
                         Auto-fill
                       </button>
                     </div>
                   )}
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-[#193625]">6-Digit Code</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-bold text-[#193625]">6-Digit Code</label>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -426,12 +426,12 @@ export default function Login() {
                       placeholder="• • • • • •"
                       maxLength={6}
                       autoFocus
-                      className="w-full text-center tracking-[0.5em] font-mono rounded-2xl border border-[#cbd8bf] bg-white px-4 py-3.5 text-xl font-extrabold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 shadow-sm"
+                      className="w-full text-center tracking-[0.5em] font-mono rounded-2xl border border-[#cbd8bf] bg-white px-4 py-4 text-2xl font-extrabold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 shadow-sm"
                     />
                     {errors.otp && <p className="text-xs text-rose-600 font-semibold mt-1">{errors.otp}</p>}
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-[#52705d]">
+                  <div className="flex items-center justify-between text-sm text-[#52705d]">
                     {cooldown > 0 ? (
                       <span>Resend OTP in <strong>00:{cooldown < 10 ? `0${cooldown}` : cooldown}</strong></span>
                     ) : (
@@ -440,7 +440,7 @@ export default function Login() {
                         onClick={handleRequestOtp}
                         className="font-bold text-[#2f6b45] hover:underline flex items-center gap-1 cursor-pointer"
                       >
-                        <RefreshCw size={12} /> Resend OTP now
+                        <RefreshCw size={13} /> Resend OTP now
                       </button>
                     )}
                   </div>
@@ -448,15 +448,15 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={submitting || otpCode.length < 4}
-                    className="w-full rounded-2xl bg-[#2f6b45] py-3.5 text-xs font-bold text-white shadow-lg hover:bg-[#20492f] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer transition-all"
+                    className="w-full rounded-2xl bg-[#2f6b45] py-4 text-sm font-extrabold text-white shadow-xl hover:bg-[#20492f] disabled:opacity-50 flex items-center justify-center gap-2.5 cursor-pointer transition-all"
                   >
                     {submitting ? (
                       <>
-                        <LoaderCircle size={16} className="animate-spin" /> Verifying…
+                        <LoaderCircle size={17} className="animate-spin" /> Verifying…
                       </>
                     ) : (
                       <>
-                        Verify &amp; Enter Dashboard <CheckCircle2 size={16} />
+                        Verify &amp; Enter Dashboard <CheckCircle2 size={17} />
                       </>
                     )}
                   </button>
@@ -530,15 +530,15 @@ export default function Login() {
                   <button
                     type="submit"
                     disabled={submitting || !profileName.trim()}
-                    className="w-full rounded-2xl bg-[#2f6b45] py-3.5 text-xs font-bold text-white shadow-lg hover:bg-[#20492f] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer transition-all"
+                    className="w-full rounded-2xl bg-[#2f6b45] py-4 text-sm font-extrabold text-white shadow-xl hover:bg-[#20492f] disabled:opacity-50 flex items-center justify-center gap-2.5 cursor-pointer transition-all"
                   >
                     {submitting ? (
                       <>
-                        <LoaderCircle size={16} className="animate-spin" /> Saving Profile…
+                        <LoaderCircle size={17} className="animate-spin" /> Saving Profile…
                       </>
                     ) : (
                       <>
-                        Save &amp; Open My Field Desk <ArrowRight size={15} />
+                        Save &amp; Open My Field Desk <ArrowRight size={17} />
                       </>
                     )}
                   </button>
@@ -552,23 +552,23 @@ export default function Login() {
           {/* TAB 2: ADMIN LOGIN FLOW (PRESERVED) */}
           {/* ═════════════════════════════════════════════════════════════════ */}
           {activeTab === "admin" && (
-            <form onSubmit={handleAdminSubmit} className="space-y-4 animate-in fade-in" noValidate>
-              <div className="auth-heading space-y-1">
+            <form onSubmit={handleAdminSubmit} className="space-y-5 animate-in fade-in" noValidate>
+              <div className="auth-heading space-y-1.5">
                 <p className="text-xs font-extrabold uppercase tracking-widest text-amber-700">
                   Administrator Portal
                 </p>
-                <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#183624]">
+                <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-[#183624] tracking-tight">
                   Admin Login
                 </h2>
-                <p className="text-xs text-[#52705d]">
+                <p className="text-sm text-[#52705d] leading-relaxed">
                   Authorized agronomist and administrative access with site-wide Edit Mode.
                 </p>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-[#193625]">Admin Email</label>
+              <div className="space-y-1.5">
+                <label className="block text-sm font-bold text-[#193625]">Admin Email</label>
                 <div className="relative flex items-center">
-                  <ShieldAlert size={16} className="absolute left-3.5 text-amber-700" />
+                  <ShieldAlert size={18} className="absolute left-3.5 text-amber-700" />
                   <input
                     type="email"
                     value={adminIdentifier}
@@ -578,15 +578,15 @@ export default function Login() {
                     }}
                     placeholder="e.g. meghanakotaru07@gmail.com"
                     autoFocus
-                    className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-10 pr-4 py-3 text-xs font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-amber-500/30 shadow-sm"
+                    className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-11 pr-4 py-4 text-base font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-amber-500/30 shadow-sm"
                   />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-[#193625]">Admin Password</label>
+              <div className="space-y-1.5">
+                <label className="block text-sm font-bold text-[#193625]">Admin Password</label>
                 <div className="relative flex items-center">
-                  <LockKeyhole size={16} className="absolute left-3.5 text-amber-700" />
+                  <LockKeyhole size={18} className="absolute left-3.5 text-amber-700" />
                   <input
                     type={showPassword ? "text" : "password"}
                     value={adminPassword}
@@ -595,14 +595,14 @@ export default function Login() {
                       setErrors({});
                     }}
                     placeholder="••••••••"
-                    className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-10 pr-10 py-3 text-xs font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-amber-500/30 shadow-sm"
+                    className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-11 pr-11 py-4 text-base font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-amber-500/30 shadow-sm"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-gray-400 hover:text-gray-700 cursor-pointer"
+                    className="absolute right-3.5 text-gray-400 hover:text-gray-700 cursor-pointer"
                   >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
@@ -612,15 +612,15 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={submitting || !adminIdentifier.trim() || !adminPassword}
-                className="w-full rounded-2xl bg-amber-600 hover:bg-amber-700 py-3.5 text-xs font-bold text-white shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer transition-all"
+                className="w-full rounded-2xl bg-amber-600 hover:bg-amber-700 py-4 text-sm font-extrabold text-white shadow-xl disabled:opacity-50 flex items-center justify-center gap-2.5 cursor-pointer transition-all"
               >
                 {submitting ? (
                   <>
-                    <LoaderCircle size={16} className="animate-spin" /> Authenticating Admin…
+                    <LoaderCircle size={17} className="animate-spin" /> Authenticating Admin…
                   </>
                 ) : (
                   <>
-                    Log in as Administrator <ArrowRight size={15} />
+                    Sign In as Administrator <ArrowRight size={17} />
                   </>
                 )}
               </button>
@@ -631,3 +631,4 @@ export default function Login() {
     </main>
   );
 }
+

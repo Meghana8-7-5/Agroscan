@@ -250,7 +250,7 @@ export const aiAssistantApi = {
     farmerName?: string;
     registeredCrops?: string[];
     location?: string;
-  }) => api.post<{ success: boolean; reply: string; language: string }>("/ai/chat", data).then((r) => r.data),
+  }) => api.post<{ success: boolean; reply: string; answer?: string; language: string }>("/ai/chat", data).then((r) => r.data),
 };
 
 export type SupportTicket = {

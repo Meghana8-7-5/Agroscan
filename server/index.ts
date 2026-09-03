@@ -35,7 +35,7 @@ export function createApp() {
   );
   app.use(express.json({ limit: "10mb" }));
 
-  app.get("/api/health", async (_req, res) => {
+  app.get(["/api/health", "/health"], async (_req, res) => {
     const dbConnected = await checkDbConnection();
     res.status(200).json({
       status: "ok",
@@ -44,16 +44,23 @@ export function createApp() {
     });
   });
 
-  app.use("/api/auth", authRoutes);
-  app.use("/api/crops", cropsRoutes);
-  app.use("/api/weather", weatherRoutes);
-  app.use("/api/notifications", notificationsRoutes);
-  app.use("/api/detections", detectionsRoutes);
-  app.use("/api/dashboard", dashboardRoutes);
-  app.use("/api/ui-config", uiConfigRoutes);
-  app.use("/api/ai", aiAssistantRoutes);
-  app.use("/api/support", supportRoutes);
-  app.use("/api/stores", storesRoutes);
+  const routers = [
+    { prefix: "auth", router: authRoutes },
+    { prefix: "crops", router: cropsRoutes },
+    { prefix: "weather", router: weatherRoutes },
+    { prefix: "notifications", router: notificationsRoutes },
+    { prefix: "detections", router: detectionsRoutes },
+    { prefix: "dashboard", router: dashboardRoutes },
+    { prefix: "ui-config", router: uiConfigRoutes },
+    { prefix: "ai", router: aiAssistantRoutes },
+    { prefix: "support", router: supportRoutes },
+    { prefix: "stores", router: storesRoutes },
+  ];
+
+  for (const { prefix, router } of routers) {
+    app.use(`/api/${prefix}`, router);
+    app.use(`/${prefix}`, router);
+  }
 
   const staticPath =
     process.env.NODE_ENV === "production"

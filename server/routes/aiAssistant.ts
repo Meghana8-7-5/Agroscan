@@ -182,20 +182,22 @@ function getRuleBasedAgronomyResponse(queryText: string, lang: string, cropName?
   return `Hello! I am your AgroScan agricultural advisor. You can ask me about crop care for your ${cropName || "farm"}, pest & disease treatments, fertilizer dosage, or weather advisories.`;
 }
 
-// ── POST /api/ai/ask ─────────────────────────────────────────────────────
-router.post("/ask", async (req, res) => {
+// ── Unified Handler for AI Advisory Queries (/ask, /chat, /) ───────────
+async function handleAiQuery(req: any, res: any) {
   try {
     const {
       message,
       language: userPrefLang = "en",
       farmerName = "Farmer",
       crops = [],
+      registeredCrops = [],
       location = "Andhra Pradesh",
     } = req.body as {
       message?: string;
       language?: string;
       farmerName?: string;
       crops?: string[];
+      registeredCrops?: string[];
       location?: string;
     };
 
@@ -205,13 +207,14 @@ router.post("/ask", async (req, res) => {
     }
 
     const trimmedMessage = message.trim();
+    const effectiveCrops = registeredCrops.length > 0 ? registeredCrops : crops;
     const detectedLang = detectLanguageFromText(trimmedMessage, userPrefLang);
-    const cropsStr = Array.isArray(crops) ? crops.join(", ") : String(crops || "");
-    const primaryCrop = Array.isArray(crops) && crops.length > 0 ? crops[0] : undefined;
+    const cropsStr = Array.isArray(effectiveCrops) ? effectiveCrops.join(", ") : String(effectiveCrops || "");
+    const primaryCrop = Array.isArray(effectiveCrops) && effectiveCrops.length > 0 ? effectiveCrops[0] : undefined;
 
     console.log(`[AI-ASSISTANT] Incoming query: "${trimmedMessage.slice(0, 50)}..." (prefLang=${userPrefLang}, detectedLang=${detectedLang})`);
 
-    // 1. Try real LLM with detected language
+    // 1. Try real LLM with target language
     let answer = await callLLM(trimmedMessage, detectedLang, farmerName, cropsStr, location);
 
     // 2. Fallback to expert agronomic engine
@@ -220,19 +223,30 @@ router.post("/ask", async (req, res) => {
     }
 
     res.json({
+      success: true,
+      reply: answer,
       answer,
       detectedLanguage: detectedLang,
+      language: detectedLang,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error("[AI-ASSISTANT] Error:", error);
     // Return graceful fallback rather than failing
     res.json({
+      success: true,
+      reply: "I am ready to assist with your farm queries. Please ask about pest control, fertilizer dosages, or irrigation scheduling.",
       answer: "I am ready to assist with your farm queries. Please ask about pest control, fertilizer dosages, or irrigation scheduling.",
       detectedLanguage: "en",
+      language: "en",
       timestamp: new Date().toISOString(),
     });
   }
-});
+}
+
+// Support both /ask and /chat routes
+router.post("/ask", handleAiQuery);
+router.post("/chat", handleAiQuery);
+router.post("/", handleAiQuery);
 
 export default router;

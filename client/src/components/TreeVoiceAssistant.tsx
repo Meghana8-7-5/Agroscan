@@ -289,14 +289,29 @@ export default function TreeVoiceAssistant() {
         location: `${location.villageCity}, ${location.district}`,
       });
 
-      if (data.reply) {
-        setAssistantReply(data.reply);
-        speakText(data.reply);
+      const reply = data?.reply || data?.answer;
+      if (reply) {
+        setAssistantReply(reply);
+        speakText(reply);
       }
     } catch (err) {
-      console.warn("AI LLM call failed:", err);
-      setErrorMessage("I'm having trouble connecting to the advisory service. Please check your internet connection.");
-      setAssistantReply("Connection issue. Please try again or check your internet.");
+      console.warn("AI advisory call failed, providing local agricultural fallback:", err);
+      const fallbackReplies: Record<string, string> = {
+        te: "నేను మీ ఆగ్రోస్కాన్ వ్యవసాయ సలహాదారుని. పంట సంరక్షణ, ఎరువుల మోతాదు లేదా తెగుళ్ల నివారణ గురించి అడగండి.",
+        hi: "मैं आपका एग्रोस्कैन कृषि सलाहकार हूँ। फसल सुरक्षा, खाद या कीट नियंत्रण के बारे में पूछें।",
+        ta: "நான் உங்கள் அக்ரோஸ்கேன் வேளாண் ஆலோசகர். பயிர் பாதுகாப்பு மற்றும் உரங்களைப் பற்றி கேளுங்கள்.",
+        kn: "ನಾನು ನಿಮ್ಮ ಆಗ್ರೋಸ್ಕ್ಯಾನ್ ಕೃಷಿ ಸಲಹೆಗಾರ. ಬೆಳೆ ರಕ್ಷಣೆ ಮತ್ತು ರಸಗೊಬ್ಬರದ ಬಗ್ಗೆ ಕೇಳಿ.",
+        mr: "मी तुमचा कृषी सल्लागार आहे. पीक संरक्षण, खतांचे प्रमाण किंवा कीड नियंत्रणाबद्दल विचारा.",
+        pa: "ਮੈਂ ਤੁਹਾਡਾ ਖੇਤੀਬਾੜੀ ਸਲਾਹਕਾਰ ਹਾਂ। ਫਸਲ ਸੁਰੱਖਿਆ ਅਤੇ ਖਾਦ ਬਾਰੇ ਪੁੱਛੋ।",
+        bn: "আমি আপনার কৃষি উপদেষ্টা। ফসল সুরক্ষা এবং সার সম্পর্কে জিজ্ঞাসা করুন।",
+        gu: "હું તમારો કૃષિ સલાહકાર છું. પાક સંરક્ષણ અને ખાતર વિશે પૂછો.",
+        ml: "ഞാൻ നിങ്ങളുടെ കാർഷിക ഉപദേഷ്ടാവാണ്. വിള സംരക്ഷണത്തെക്കുറിച്ച് ചോദിക്കുക.",
+        en: "I am your AgroScan agricultural advisor. Please ask about crop protection, fertilizer dosage, or pest management.",
+      };
+      const fallback = fallbackReplies[language] || fallbackReplies.en;
+      setAssistantReply(fallback);
+      speakText(fallback);
+      setErrorMessage("Advisory engine momentarily busy. Provided offline agronomic advice.");
     } finally {
       setIsThinking(false);
     }

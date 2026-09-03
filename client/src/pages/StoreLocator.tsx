@@ -123,7 +123,7 @@ export default function StoreLocator() {
   return (
     <main className="workspace-page min-h-screen bg-[#f7f8f4] text-[#1c3827]">
       {/* Top Header */}
-      <header className="workspace-topbar sticky top-0 z-40 bg-[#f7f8f4]/90 backdrop-blur border-b border-[#e1e6d7] px-6 py-4 flex items-center justify-between">
+      <header className="workspace-topbar sticky top-[38px] z-30 bg-[#f7f8f4]/95 backdrop-blur border-b border-[#e1e6d7] px-6 py-4 flex items-center justify-between">
         <Link href="/dashboard" className="workspace-back inline-flex items-center gap-2 text-sm font-bold text-[#2f6b45] no-underline hover:underline">
           <ArrowLeft size={17} /> <span>{t("back_to_dashboard")}</span>
         </Link>
@@ -162,6 +162,23 @@ export default function StoreLocator() {
             </p>
           </div>
         </EditableFrame>
+
+        {/* Interactive Leaflet Map */}
+        <MapView
+          initialCenter={{
+            lat: location.latitude || 16.3067,
+            lng: location.longitude || 80.4365,
+          }}
+          initialZoom={13}
+          markers={stores.map((s) => ({
+            lat: s.latitude,
+            lng: s.longitude,
+            title: s.name,
+            popupHtml: `<strong>${s.name}</strong><br/>${s.address}<br/><span style="color:#2f6b45;font-weight:bold">${s.dealerType}</span>`,
+            isPrimary: false,
+          }))}
+          className="h-[320px] rounded-3xl"
+        />
 
         {/* Honest Fallback Alert (if remote area) */}
         {fallbackMessage && (
