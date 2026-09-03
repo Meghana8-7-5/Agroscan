@@ -71,17 +71,25 @@ export default function TreeVoiceAssistant() {
     }
   }, []);
 
-  // Natural synthetic voice selection
+  // Natural synthetic voice selection for all supported Indic & English languages
   const selectSyntheticVoice = useCallback((speechCode: string): SpeechSynthesisVoice | null => {
     if (availableVoices.length === 0) return null;
-    const codePrefix = speechCode.toLowerCase().split("-")[0];
-    const matching = availableVoices.filter((v) => v.lang.toLowerCase().includes(codePrefix));
+    const targetCode = speechCode.toLowerCase();
+    const codePrefix = targetCode.split("-")[0];
+
+    // 1. Exact match (e.g. te-IN, hi-IN, ta-IN, kn-IN, mr-IN, en-IN)
+    const exactMatch = availableVoices.find((v) => v.lang.toLowerCase().replace("_", "-") === targetCode);
+    if (exactMatch) return exactMatch;
+
+    // 2. Prefix match (e.g. te, hi, ta, kn, mr, pa, bn, gu, ml)
+    const matching = availableVoices.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith(codePrefix));
     const natural = matching.find((v) =>
       v.name.toLowerCase().includes("natural") ||
       v.name.toLowerCase().includes("neural") ||
-      v.name.toLowerCase().includes("google")
+      v.name.toLowerCase().includes("google") ||
+      v.name.toLowerCase().includes("india")
     );
-    return natural || matching[0] || availableVoices[0] || null;
+    return natural || matching[0] || null;
   }, [availableVoices]);
 
   const speakText = useCallback((text: string) => {
@@ -111,7 +119,7 @@ export default function TreeVoiceAssistant() {
     }
   }, [audioEnabled, currentLangObj, selectSyntheticVoice]);
 
-  // Web Speech STT Setup — re-initialize immediately when language changes
+  // Web Speech STT Setup with Full Barge-In / Interrupt Handling
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -120,13 +128,30 @@ export default function TreeVoiceAssistant() {
       recognition.interimResults = true;
       recognition.lang = currentLangObj.speechCode;
 
+      // Barge-in: immediately cut off TTS playback as soon as user starts speaking
+      const handleUserSpeechStart = () => {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+        setIsSpeaking(false);
+      };
+
       recognition.onstart = () => {
+        handleUserSpeechStart();
         setIsListening(true);
         setTranscript("");
         setErrorMessage("");
       };
 
+      if ("onspeechstart" in recognition) {
+        recognition.onspeechstart = handleUserSpeechStart;
+      }
+      if ("onsoundstart" in recognition) {
+        recognition.onsoundstart = handleUserSpeechStart;
+      }
+
       recognition.onresult = (event: any) => {
+        handleUserSpeechStart();
         const current = event.resultIndex;
         const text = event.results[current][0].transcript;
         setTranscript(text);
@@ -220,6 +245,11 @@ export default function TreeVoiceAssistant() {
 
   const toggleListening = () => {
     setErrorMessage("");
+    // Barge-in: stop any playing speech when mic is pressed
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
@@ -237,41 +267,143 @@ export default function TreeVoiceAssistant() {
     }
   };
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ALL 11 DASHBOARD FEATURE ROUTES & MULTILINGUAL VOICE INTENT REGISTRY
+  // ═══════════════════════════════════════════════════════════════════════════
+  const NAVIGATION_INTENTS: Array<{
+    route: string;
+    keywords: string[];
+    replies: Record<string, string>;
+  }> = [
+    {
+      route: "/detection",
+      keywords: ["scan", "scanner", "disease", "pest", "leaf", "plant diagnosis", "diagnosis", "ఆకు", "స్కాన్", "తెగులు", "రోగం", "రోగ", "పత్తి", "पत्ती", "रोग", "स्कैन", "कीट", "நோய்", "ஸ்கேன்", "ರೋಗ", "ಎಲೆ"],
+      replies: {
+        en: "Navigating to Plant & Disease Scanner. Show me a leaf photo to diagnose.",
+        te: "ఆకు తెగుళ్లు & పురుగుల స్కానర్‌ను తెరుస్తున్నాను. విశ్లేషణకు ఆకు ఫోటోను చూపించండి.",
+        hi: "पौधा व रोग स्कैनर खोल रहा हूँ। निदान के लिए पत्ती की फोटो दिखाएं।",
+        ta: "பயிர் மற்றும் நோய் ஸ்கேனரைத் திறக்கிறேன். இலையைக் காட்டவும்.",
+        kn: "ಬೆಳೆ ಮತ್ತು ರೋಗ ಸ್ಕ್ಯಾನರ್ ತೆರೆಯುತ್ತಿದ್ದೇನೆ. ಎಲೆಯ ಫೋಟೋ ತೋರಿಸಿ.",
+      },
+    },
+    {
+      route: "/soil-recommendation",
+      keywords: ["soil", "soil test", "soil recommender", "recommend crop", "soil analysis", "fertilizer test", "భూమి", "నేల", "మట్టి", "సాయిల్", "మిట్టి", "मिट्टी", "मृदा", "मृदा परीक्षण", "मண்", "ಮಣ್ಣು", "ಮಣ್ಣಿನ ಪರೀಕ್ಷೆ"],
+      replies: {
+        en: "Opening Soil Crop Recommender for optimal crop and nutrient selection.",
+        te: "నేల పరీక్ష & అనువైన పంటల సిఫార్సు విభాగాన్ని తెరుస్తున్నాను.",
+        hi: "मिट्टी परीक्षण और फसल सिफारिश पृष्ठ खोल रहा हूँ।",
+        ta: "மண் பரிசோதனை மற்றும் பயிர் பரிந்துரை பக்கத்தைத் திறக்கிறேன்.",
+        kn: "ಮಣ್ಣು ಪರೀಕ್ಷೆ ಮತ್ತು ಬೆಳೆ ಶಿಫಾರಸು ತೆರೆಯುತ್ತಿದ್ದೇನೆ.",
+      },
+    },
+    {
+      route: "/stores",
+      keywords: ["store", "stores", "market", "dealer", "shop", "shops", "fertilizer shop", "pesticide store", "షాప్", "దుకాణం", "మార్కెట్", "మందుల షాప్", "दुकान", "बाजार", "खाद की दुकान", "கடை", "அங்காடி", "ಅಂಗಡಿ"],
+      replies: {
+        en: `Opening Market & Store locator for ${location.villageCity}.`,
+        te: `${location.villageCity} సమీపంలోని ఎరువులు మరియు పురుగుమందుల దుకాణాల వివరాలను తెరుస్తున్నాను.`,
+        hi: `${location.villageCity} के नजदीकी कृषि दुकानों की सूची खोल रहा हूँ।`,
+        ta: `${location.villageCity} அருகிலுள்ள வேளாண் கடைகளைத் திறக்கிறேன்.`,
+        kn: `${location.villageCity} ಹತ್ತಿರದ ಕೃಷಿ ಅಂಗಡಿಗಳ ಪಟ್ಟಿ ತೆರೆಯುತ್ತಿದ್ದೇನೆ.`,
+      },
+    },
+    {
+      route: "/weather",
+      keywords: ["weather", "rain", "forecast", "climate", "temperature", "spray weather", "వాతావరణం", "వర్షం", "ఎండ", "मौसम", "बारिश", "तापमान", "வானிலை", "மழை", "ಹವಾಮಾನ", "ಮಳೆ"],
+      replies: {
+        en: `Opening Live Weather Analysis and Spray Forecast for ${location.villageCity}.`,
+        te: `${location.villageCity} లైవ్ వాతావరణం మరియు మందుల పిచికారీ సూచనలను తెరుస్తున్నాను.`,
+        hi: `${location.villageCity} का लाइव मौसम और छिड़काव पूर्वानुमान खोल रहा हूँ।`,
+        ta: `${location.villageCity} நேரடி வானிலை மற்றும் தெளிப்பு முன்னறிவிப்பைத் திறக்கிறேன்.`,
+        kn: `${location.villageCity} ಹವಾಮಾನ ಮತ್ತು ಸಿಂಪಡಣೆ ಮುನ್ಸೂಚನೆ ತೆರೆಯುತ್ತಿದ್ದೇನೆ.`,
+      },
+    },
+    {
+      route: "/crop-registration",
+      keywords: ["register", "registration", "add crop", "new crop", "enroll crop", "crop registration", "నమోదు", "కొత్త పంట", "పంట నమోదు", "पंजीकरण", "नई फसल", "फसल जोड़ें", "பதிவு", "புதிய பயிர்", "ನೋಂದಣಿ"],
+      replies: {
+        en: "Opening Crop Registration desk to register your new crop field.",
+        te: "కొత్త పంట నమోదు విభాగాన్ని తెరుస్తున్నాను.",
+        hi: "नया फसल पंजीकरण पृष्ठ खोल रहा हूँ।",
+        ta: "புதிய பயிர் பதிவு பக்கத்தைத் திறக்கிறேன்.",
+        kn: "ಹೊಸ ಬೆಳೆ ನೋಂದಣಿ ಪುಟ ತೆರೆಯುತ್ತಿದ್ದೇನೆ.",
+      },
+    },
+    {
+      route: "/crop-plan",
+      keywords: ["my crops", "crop plan", "plan", "calendar", "schedule", "fertilizer schedule", "spray schedule", "నా పంటలు", "పంట ప్లాన్", "షెడ్యూల్", "క్యాలెండర్", "मेरी फसलें", "फसल योजना", "कैलेंडर", "பயிர் திட்டம்", "ನನ್ನ ಬೆಳೆ"],
+      replies: {
+        en: "Opening your personalized My Crops and Farm Planning calendar.",
+        te: "మీ పంటల ప్రణాళిక మరియు దశల వారీ షెడ్యూల్‌ను తెరుస్తున్నాను.",
+        hi: "आपकी फसल योजना और देखभाल कैलेंडर खोल रहा हूँ।",
+        ta: "உங்கள் பயிர் பராமரிப்பு திட்டத்தைத் திறக்கிறேன்.",
+        kn: "ನಿಮ್ಮ ಬೆಳೆ ಯೋಜನೆ ಮತ್ತು ಆರೈಕೆ ವೇಳಾಪಟ್ಟಿ ತೆರೆಯುತ್ತಿದ್ದೇನೆ.",
+      },
+    },
+    {
+      route: "/knowledge-base",
+      keywords: ["knowledge", "knowledge base", "guide", "crops list", "encyclopedia", "library", "37 crop", "విజ్ఞానం", "పంటల సమాచారం", "పుస్తకం", "జ్ఞానం", "ज्ञान", "फसल जानकारी", "कृषि ज्ञान", "அறிவுக்களஞ்சியம்", "ಜ್ಞಾನ ಭಂಡಾರ"],
+      replies: {
+        en: "Opening 37-Crop Agricultural Knowledge Base.",
+        te: "37 ప్రధాన పంటల సమగ్ర వ్యవసాయ విజ్ఞాన విభాగాన్ని తెరుస్తున్నాను.",
+        hi: "37 फसलों का संपूर्ण कृषि ज्ञानकोश खोल रहा हूँ।",
+        ta: "37 பயிர்களின் வேளாண் அறிவுக்களஞ்சியத்தைத் திறக்கிறேன்.",
+        kn: "37 ಬೆಳೆಗಳ ಸಮಗ್ರ ಕೃಷಿ ಜ್ಞಾನ ಭಂಡಾರ ತೆರೆಯುತ್ತಿದ್ದೇನೆ.",
+      },
+    },
+    {
+      route: "/notifications",
+      keywords: ["notification", "notifications", "alert", "alerts", "updates", "నోటిఫికేషన్", "హెచ్చరిక", "సందేశాలు", "సూచనలు", "सूचना", "अलर्ट", "संदेश", "அறிவிப்பு", "எச்சரிக்கை", "ತಿಳುವಳಿಕೆ"],
+      replies: {
+        en: "Opening your Notifications & Agricultural Alert Center.",
+        te: "మీ పంట హెచ్చరికలు మరియు నోటిఫికేషన్ల విభాగాన్ని తెరుస్తున్నాను.",
+        hi: "आपकी सूचनाएं और कृषि अलर्ट पृष्ठ खोल रहा हूँ।",
+        ta: "உங்கள் அறிவிப்புகள் மற்றும் எச்சரிக்கைப் பக்கத்தைத் திறக்கிறேன்.",
+        kn: "ನಿಮ್ಮ ಕೃಷಿ ಎಚ್ಚರಿಕೆಗಳು ಮತ್ತು ಅಧಿಸೂಚನೆಗಳು ತೆರೆಯುತ್ತಿದ್ದೇನೆ.",
+      },
+    },
+    {
+      route: "/help-desk",
+      keywords: ["help", "support", "helpdesk", "officer", "agronomist", "complaint", "ticket", "call officer", "సహాయం", "హెల్ప్‌డెస్క్", "అధికారి", "ఫిర్యాదు", "మద్దతు", "मदद", "सहयोग", "अधिकारी", "हेल्पडेस्क", "शिकायत", "உதவி", "ಸಹಾಯ"],
+      replies: {
+        en: "Opening Agronomist Help Desk & Support Center.",
+        te: "వ్యవసాయ శాస్త్రవేత్తల హెల్ప్‌డెస్క్ మరియు మద్దతు విభాగాన్ని తెరుస్తున్నాను.",
+        hi: "कृषि विशेषज्ञ हेल्पडेस्क और सहायता केंद्र खोल रहा हूँ।",
+        ta: "வேளாண் நிபுணர் உதவி மையத்தைத் திறக்கிறேன்.",
+        kn: "ಕೃಷಿ ತಜ್ಞರ ಸಹಾಯ ಕೇಂದ್ರ ತೆರೆಯುತ್ತಿದ್ದೇನೆ.",
+      },
+    },
+    {
+      route: "/dashboard",
+      keywords: ["dashboard", "home", "main screen", "control desk", "హోమ్", "డాష్‌బోర్డ్", "డెస్క్", "होम", "डैशबोर्ड", "முக்கிய பக்கம்", "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್"],
+      replies: {
+        en: "Navigating to your Farm Control Dashboard.",
+        te: "మీ ఫార్మ్ కంట్రోల్ డాష్‌బోర్డ్‌కు వెళ్తున్నాను.",
+        hi: "आपके मुख्य फार्म डैशबोर्ड पर जा रहा हूँ।",
+        ta: "உங்கள் முக்கிய கட்டுப்பாட்டுப் பக்கத்திற்கு செல்கிறேன்.",
+        kn: "ಮುಖ್ಯ ಕೃಷಿ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್‌ಗೆ ಹೋಗುತ್ತಿದ್ದೇನೆ.",
+      },
+    },
+  ];
+
   // Process user input (Speech or Typed) via LLM backend route
   const processQuestion = async (queryText: string) => {
     if (!queryText.trim()) return;
     setErrorMessage("");
-    const text = queryText.toLowerCase();
+    const text = queryText.toLowerCase().trim();
 
-    // Check fast navigation commands
-    if (text.includes("scan") || text.includes("disease scanner") || text.includes("leaf")) {
-      const reply = "Navigating to Plant & Disease Scanner. Show me a leaf photo to diagnose.";
+    // Check generic navigation intent across all 11 features
+    const matchedIntent = NAVIGATION_INTENTS.find((intent) =>
+      intent.keywords.some((kw) => text.includes(kw.toLowerCase()))
+    );
+
+    if (matchedIntent) {
+      const reply = matchedIntent.replies[language] || matchedIntent.replies.en;
       setAssistantReply(reply);
       speakText(reply);
       setTimeout(() => {
-        setPageLocation("/detection");
-        setIsOpen(false);
-      }, 1200);
-      return;
-    }
-
-    if (text.includes("store") || text.includes("market") || text.includes("dealer")) {
-      const reply = `Opening Market Store locator for ${location.villageCity}.`;
-      setAssistantReply(reply);
-      speakText(reply);
-      setTimeout(() => {
-        setPageLocation("/stores");
-        setIsOpen(false);
-      }, 1200);
-      return;
-    }
-
-    if (text.includes("weather") || text.includes("rain") || text.includes("forecast")) {
-      const reply = `Opening Weather Analysis for ${location.villageCity}.`;
-      setAssistantReply(reply);
-      speakText(reply);
-      setTimeout(() => {
-        setPageLocation("/weather");
+        setPageLocation(matchedIntent.route);
         setIsOpen(false);
       }, 1200);
       return;

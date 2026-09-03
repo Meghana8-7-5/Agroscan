@@ -213,7 +213,7 @@ export const notificationsApi = {
 };
 
 export const detectionsApi = {
-  analyze: (payload?: string | { imageDataUrl?: string; cropRegistrationId?: string }, cropRegistrationId?: string) => {
+  analyze: (payload?: string | { imageDataUrl?: string; cropRegistrationId?: string; targetCrop?: string; sampleHint?: string }, cropRegistrationId?: string) => {
     const body =
       typeof payload === "string"
         ? { imageDataUrl: payload, cropRegistrationId }

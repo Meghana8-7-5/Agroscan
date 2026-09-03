@@ -202,34 +202,34 @@ export default function Login() {
   const overlayDarkness = heroCustom?.overlayDarkness !== undefined ? heroCustom.overlayDarkness : (activeTab === "admin" ? 0.72 : 0.68);
 
   return (
-    <main className="auth-page auth-page-login min-h-screen flex flex-col md:flex-row">
+    <main className="auth-page auth-page-login">
       {/* Left Visual Hero Section */}
       <EditableFrame
         id="login_hero_panel"
         isHeroPanel
-        className="auth-visual md:w-1/2 min-h-[380px] md:min-h-screen p-8 sm:p-12 lg:p-16 flex flex-col justify-between"
+        className="auth-visual"
         style={{
           backgroundImage: `linear-gradient(180deg, rgba(20,48,30,${overlayDarkness * 0.25}) 15%, rgba(20,48,30,${overlayDarkness}) 100%), url(${heroBgImage})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       >
-        <Link href="/" className="auth-brand inline-flex items-center gap-2.5 text-white font-display text-2xl font-bold no-underline" aria-label="Back to AgroScan home">
-          <EditableFrame id="login_brand_mark" className="auth-brand-mark h-10 w-10 rounded-xl bg-[#2f6b45] text-white flex items-center justify-center shadow-lg">
+        <Link href="/" className="auth-brand" aria-label="Back to AgroScan home">
+          <EditableFrame id="login_brand_mark" className="auth-brand-mark">
             <Leaf size={22} />
           </EditableFrame>
           <span>AgroScan</span>
         </Link>
 
-        <div className="auth-visual-copy space-y-4 my-auto py-8">
+        <div className="auth-visual-copy">
           <EditableFrame id="login_index_kicker" isTextOnly>
-            <p className="auth-visual-index text-xs font-extrabold uppercase tracking-widest text-emerald-300">
+            <p className="auth-visual-index">
               {getCustomization("login_index_kicker")?.title || (activeTab === "admin" ? "02 / ADMIN OPERATIONS DESK" : "02 / INSTANT FARMER MOBILE ACCESS")}
             </p>
           </EditableFrame>
 
           <EditableFrame id="login_headline" isTextOnly>
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.08] text-white tracking-tight">
+            <h1>
               {headlineCustom?.title || (
                 activeTab === "admin" ? (
                   <>
@@ -247,7 +247,7 @@ export default function Login() {
           </EditableFrame>
 
           <EditableFrame id="login_subtext" isTextOnly>
-            <p className="text-base text-emerald-100 max-w-lg mt-4 leading-relaxed">
+            <p>
               {subtextCustom?.subtitle || (
                 activeTab === "admin"
                   ? "Access administrative controls, review incoming farmer complaints, manage crop care advisories, and track Gram Sachivalayam agronomist referrals."
@@ -256,7 +256,7 @@ export default function Login() {
             </p>
           </EditableFrame>
 
-          <div className="auth-visual-foot text-sm text-emerald-200 mt-6 flex items-center gap-2.5 font-medium">
+          <div className="auth-visual-foot">
             {activeTab === "admin" ? (
               <><ShieldAlert size={19} className="text-amber-400 shrink-0" /> Verified Agronomic Control Center</>
             ) : (
@@ -267,10 +267,10 @@ export default function Login() {
       </EditableFrame>
 
       {/* Right Login / OTP Form Panel */}
-      <EditableFrame id="login_form_panel" className="auth-form-panel md:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-16" defaultBgColor="#fdfcf8">
-        <div className="auth-form-inner auth-form-inner-login max-w-lg w-full space-y-7">
+      <EditableFrame id="login_form_panel" className="auth-form-panel" defaultBgColor="#fdfcf8">
+        <div className="auth-form-inner auth-form-inner-login space-y-7">
           <div className="auth-form-topline flex items-center justify-between">
-            <Link href="/get-started" className="auth-back-link text-sm font-bold text-[#2f6b45] flex items-center gap-1.5 hover:underline">
+            <Link href="/get-started" className="auth-back-link">
               <ArrowLeft size={16} /> Back to role select
             </Link>
             <div className="flex items-center gap-1.5">
