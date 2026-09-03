@@ -284,17 +284,6 @@ export default function Dashboard() {
               </Link>
             ))}
           </nav>
-
-          <div className="dashboard-side-summary">
-            <div>
-              <span>{t("my_crops")}</span>
-              <strong>{summary?.activeCrops ?? 0}</strong>
-            </div>
-            <div>
-              <span>{t("notifications")}</span>
-              <strong>{summary?.unreadNotifications ?? 0}</strong>
-            </div>
-          </div>
         </div>
       </aside>
 

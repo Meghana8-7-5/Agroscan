@@ -41,7 +41,16 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem("agroscan_user_location");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object") {
+          return {
+            ...defaultLocation,
+            ...parsed,
+            villageCity: parsed.villageCity || defaultLocation.villageCity,
+            district: parsed.district || defaultLocation.district,
+            state: parsed.state || defaultLocation.state,
+          };
+        }
       } catch {
         // fallback
       }

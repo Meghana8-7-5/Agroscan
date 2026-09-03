@@ -21,7 +21,7 @@ import EditableFrame from "./EditableFrame";
 
 export default function TreeVoiceAssistant() {
   const [, setPageLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { location } = useLocationContext();
   const { language, setLanguage, languages, currentLangObj, t } = useLanguage();
 
@@ -47,8 +47,9 @@ export default function TreeVoiceAssistant() {
     setAssistantReply(t("auto_greeting", { name: farmerName }));
   }, [language, farmerName, t]);
 
-  // Load farmer's registered crops for dynamic prompt chips
+  // Load farmer's registered crops for dynamic prompt chips when authenticated
   useEffect(() => {
+    if (!isAuthenticated) return;
     cropsApi.list()
       .then((crops) => {
         if (Array.isArray(crops)) {
@@ -56,7 +57,7 @@ export default function TreeVoiceAssistant() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [isAuthenticated]);
 
   // Synthetic voices setup
   useEffect(() => {
@@ -353,18 +354,25 @@ export default function TreeVoiceAssistant() {
   return (
     <>
       {/* Floating In-App Assistant LEAF Button */}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         className={`fixed bottom-6 right-6 z-50 flex h-16 w-16 items-center justify-center rounded-full border-2 border-emerald-300/40 bg-gradient-to-r from-[#2f6b45] to-[#1d422a] text-white shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer ${
           isListening ? "animate-pulse ring-8 ring-emerald-500/30" : ""
         }`}
         onClick={openAssistant}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openAssistant();
+          }
+        }}
         aria-label="Open AgroScan Leaf Voice Assistant"
       >
         <EditableFrame id="voice_assistant_floating_icon" className="h-10 w-10 rounded-full bg-transparent text-emerald-200">
           <Leaf size={28} className={isListening ? "text-emerald-300 animate-spin" : "text-emerald-200"} />
         </EditableFrame>
-      </button>
+      </div>
 
       {/* Voice Assistant Overlay Modal */}
       {isOpen && (

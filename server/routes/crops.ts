@@ -931,8 +931,39 @@ router.get("/plans/:planId/tasks", requireAuth, async (req, res) => {
     console.warn("Plan tasks DB fallback:", error);
   }
 
-  // Memory fallback
-  const tasks = inMemoryTasks.filter((t) => t.cropPlanId === planId);
+  // Memory fallback with dynamic template auto-generation
+  let tasks = inMemoryTasks.filter((t) => t.cropPlanId === planId);
+  if (tasks.length === 0) {
+    const crop = inMemoryCrops.find((c) => c.planId === planId) || inMemoryCrops[0];
+    const cropKey = (crop?.cropName || "paddy").toLowerCase().trim();
+    const matchedTemplate =
+      CROP_CARE_TEMPLATES[cropKey] ||
+      (cropKey.includes("rice") || cropKey.includes("paddy") ? CROP_CARE_TEMPLATES.paddy : null) ||
+      (cropKey.includes("corn") || cropKey.includes("maize") ? CROP_CARE_TEMPLATES.maize : null) ||
+      (cropKey.includes("tomato") ? CROP_CARE_TEMPLATES.tomato : null) ||
+      (cropKey.includes("cotton") ? CROP_CARE_TEMPLATES.cotton : null) ||
+      (cropKey.includes("wheat") ? CROP_CARE_TEMPLATES.wheat : null) ||
+      (cropKey.includes("chilli") ? CROP_CARE_TEMPLATES.chilli : null) ||
+      DEFAULT_CROP_TEMPLATE;
+
+    const baseDate = new Date(crop?.sowingDate || new Date());
+    tasks = matchedTemplate.map((templateTask, i) => {
+      const taskDueDate = new Date(baseDate);
+      taskDueDate.setDate(taskDueDate.getDate() + templateTask.days);
+      const generatedTask: StoredCropTask = {
+        id: `task_${planId}_${i}`,
+        cropPlanId: planId,
+        label: templateTask.name,
+        date: taskDueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+        status: "upcoming",
+        category: templateTask.category,
+        priority: templateTask.priority,
+        notes: `${templateTask.reasonWhy} | Action: ${templateTask.suggestedAction}`,
+      };
+      inMemoryTasks.push(generatedTask);
+      return generatedTask;
+    });
+  }
   res.json(tasks);
 });
 

@@ -39,6 +39,7 @@ import TreeVoiceAssistant from "./components/TreeVoiceAssistant";
 import ProfileSettingsModal from "./components/ProfileSettingsModal";
 import AdminExitModal from "./components/AdminExitModal";
 import EditableFrame from "./components/EditableFrame";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function GlobalTopBar() {
   const { user, isAuthenticated } = useAuth();
@@ -270,7 +271,9 @@ export default function App() {
       <LocationProvider>
         <UiEditProvider>
           <LanguageProvider>
-            <AppContent />
+            <ErrorBoundary>
+              <AppContent />
+            </ErrorBoundary>
           </LanguageProvider>
         </UiEditProvider>
       </LocationProvider>

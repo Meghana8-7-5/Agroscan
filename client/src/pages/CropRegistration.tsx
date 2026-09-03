@@ -21,7 +21,7 @@ import {
   Wheat,
   X
 } from "lucide-react";
-import { cropsApi } from "@/lib/api";
+import { cropsApi, getApiErrorMessage } from "@/lib/api";
 import { CROPS_DATABASE, CropData } from "../data/cropsDatabase";
 import { useLocationContext } from "@/contexts/LocationContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -164,33 +164,33 @@ export default function CropRegistration() {
       setError("");
       try {
         const res = await cropsApi.register({
-          location: form.location,
-          state: form.state,
-          district: form.district,
-          landArea: form.landArea,
-          landUnit: form.landUnit,
-          startDate: form.startDate,
-          cropName: form.cropName || "Paddy",
-          variety: form.variety,
-          season: form.season,
-          process: form.process,
-          notes: form.notes,
+          location: form.location || location.villageCity || "Gowdapalem",
+          state: form.state || location.state || "Andhra Pradesh",
+          district: form.district || location.district || "Guntur",
+          landArea: form.landArea || 2.5,
+          landUnit: form.landUnit || "acres",
+          startDate: form.startDate || new Date().toISOString().split("T")[0],
+          cropName: form.cropName || "Maize",
+          variety: form.variety || "",
+          season: form.season || "Kharif",
+          process: form.process || "Sowing Done",
+          notes: form.notes || "",
         });
 
         setCreatedRegistration({
           ...res,
-          cropName: form.cropName || "Paddy",
-          variety: form.variety,
-          landArea: form.landArea,
-          landUnit: form.landUnit,
-          startDate: form.startDate,
-          season: form.season,
-          location: form.location,
+          cropName: form.cropName || "Maize",
+          variety: form.variety || "",
+          landArea: form.landArea || 2.5,
+          landUnit: form.landUnit || "acres",
+          startDate: form.startDate || new Date().toISOString().split("T")[0],
+          season: form.season || "Kharif",
+          location: form.location || location.villageCity || "Gowdapalem",
         });
 
         setStep(4);
       } catch (err: any) {
-        setError(err?.response?.data?.error || "Failed to register crop. Please check your inputs.");
+        setError(getApiErrorMessage(err));
       } finally {
         setSubmitting(false);
       }
@@ -203,7 +203,7 @@ export default function CropRegistration() {
 
   return (
     <main className="workspace-page min-h-screen bg-[#f7f8f4] text-[#1c3827]">
-      <header className="workspace-topbar sticky top-0 z-40 bg-[#f7f8f4]/90 backdrop-blur border-b border-[#e1e6d7] px-6 py-4 flex items-center justify-between">
+      <header className="workspace-topbar sticky top-[38px] z-30 bg-[#f7f8f4]/95 backdrop-blur border-b border-[#e1e6d7] px-6 py-4 flex items-center justify-between">
         <Link href="/dashboard" className="workspace-back inline-flex items-center gap-2 text-sm font-bold text-[#2f6b45] no-underline hover:underline">
           <ArrowLeft size={17} /> <span>{t("back_to_dashboard")}</span>
         </Link>
