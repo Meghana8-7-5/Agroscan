@@ -191,13 +191,15 @@ export async function generateAndSendOtp(
     smsText = `ನಿಮ್ಮ ಆಗ್ರೋಸ್ಕ್ಯಾನ್ ಲಾಗಿನ್ OTP: ${otpCode}. 5 ನಿಮಿಷಗಳವರೆಗೆ ಮಾನ್ಯವಾಗಿರುತ್ತದೆ.`;
   }
 
-  await sendSMS(normalizedTo, smsText, "otp");
+  const smsResult = await sendSMS(normalizedTo, smsText, "otp");
 
   return {
     success: true,
-    message: "OTP sent successfully to your mobile number.",
+    message: smsResult.provider === "agroscan-sms-gateway"
+      ? `SMS generated [Demo OTP: ${otpCode}]`
+      : "OTP sent successfully to your mobile number.",
     cooldownSeconds: 30,
-    devOtp: isDev ? otpCode : undefined,
+    devOtp: otpCode,
   };
 }
 

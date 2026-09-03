@@ -465,43 +465,43 @@ export default function Login() {
 
               {/* Step 3: Minimal Profile Completion (First-Time Farmers Only) */}
               {otpStep === "setup_profile" && (
-                <form onSubmit={handleCompleteProfile} className="space-y-4 animate-in fade-in">
-                  <div className="auth-heading space-y-1">
-                    <span className="rounded-full bg-emerald-100 text-emerald-800 px-3 py-0.5 text-[10px] font-extrabold uppercase">
+                <form onSubmit={handleCompleteProfile} className="space-y-5 animate-in fade-in">
+                  <div className="auth-heading space-y-1.5">
+                    <span className="inline-block rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 text-xs font-extrabold uppercase tracking-wide">
                       One-Time Farmer Setup
                     </span>
-                    <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#183624]">
+                    <h2 className="font-display text-3xl sm:text-4xl font-extrabold text-[#183624] tracking-tight">
                       Tell us about your farm
                     </h2>
-                    <p className="text-xs text-[#52705d]">
+                    <p className="text-sm text-[#52705d] leading-relaxed">
                       We'll tailor your crop care reminders and local weather telemetry to your village.
                     </p>
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-[#193625]">Your Full Name *</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-bold text-[#193625]">Your Full Name *</label>
                     <div className="relative flex items-center">
-                      <User size={16} className="absolute left-3.5 text-[#557662]" />
+                      <User size={18} className="absolute left-3.5 text-[#557662]" />
                       <input
                         type="text"
                         value={profileName}
                         onChange={(e) => setProfileName(e.target.value)}
                         placeholder="e.g. Ramesh Kumar"
                         required
-                        className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-10 pr-4 py-3 text-xs font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30"
+                        className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-11 pr-4 py-3.5 text-base font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 shadow-sm"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-[#193625]">Preferred Language</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-sm font-bold text-[#193625]">Preferred Language</label>
                       <div className="relative flex items-center">
-                        <Globe size={16} className="absolute left-3.5 text-[#557662]" />
+                        <Globe size={18} className="absolute left-3.5 text-[#557662]" />
                         <select
                           value={profileLang}
                           onChange={(e) => setProfileLang(e.target.value)}
-                          className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-10 pr-4 py-3 text-xs font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 cursor-pointer"
+                          className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-11 pr-4 py-3.5 text-base font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 cursor-pointer shadow-sm"
                         >
                           {languages.map((l) => (
                             <option key={l.code} value={l.code}>
@@ -512,16 +512,16 @@ export default function Login() {
                       </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="block text-xs font-bold text-[#193625]">Village / City</label>
+                    <div className="space-y-1.5">
+                      <label className="block text-sm font-bold text-[#193625]">Village / City</label>
                       <div className="relative flex items-center">
-                        <MapPin size={16} className="absolute left-3.5 text-[#557662]" />
+                        <MapPin size={18} className="absolute left-3.5 text-[#557662]" />
                         <input
                           type="text"
                           value={profileVillage}
                           onChange={(e) => setProfileVillage(e.target.value)}
                           placeholder="e.g. Gowdapalem"
-                          className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-10 pr-4 py-3 text-xs font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30"
+                          className="w-full rounded-2xl border border-[#cbd8bf] bg-white pl-11 pr-4 py-3.5 text-base font-bold text-[#1b3b27] focus:outline-none focus:ring-2 focus:ring-[#2f6b45]/30 shadow-sm"
                         />
                       </div>
                     </div>
